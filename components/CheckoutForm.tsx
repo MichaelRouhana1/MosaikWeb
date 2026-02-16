@@ -31,6 +31,10 @@ function placeOrderAction(
   return placeOrder({
     guestEmail: (formData.get("guestEmail") as string) || null,
     paymentMethod: (formData.get("paymentMethod") as string) || "COD",
+    customerName: formData.get("customerName") as string,
+    phoneNumber: formData.get("phoneNumber") as string,
+    addressLine1: formData.get("addressLine1") as string,
+    city: formData.get("city") as string,
     items,
   })
     .then(({ orderId }) => ({ orderId }))
@@ -64,12 +68,49 @@ export function CheckoutForm({ cart }: CheckoutFormProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="customerName">Full name</Label>
+              <Input
+                id="customerName"
+                name="customerName"
+                placeholder="John Doe"
+                required
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="guestEmail">Email</Label>
               <Input
                 id="guestEmail"
                 name="guestEmail"
                 type="email"
                 placeholder="you@example.com"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Phone number</Label>
+              <Input
+                id="phoneNumber"
+                name="phoneNumber"
+                type="tel"
+                placeholder="+1 234 567 8900"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="addressLine1">Address</Label>
+              <Input
+                id="addressLine1"
+                name="addressLine1"
+                placeholder="123 Main St, Apt 4"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                name="city"
+                placeholder="New York"
                 required
               />
             </div>

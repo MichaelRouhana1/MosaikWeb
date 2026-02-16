@@ -1,0 +1,186 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import { useDropzone } from "react-dropzone";
+import { useRouter } from "next/navigation";
+import { createProduct } from "@/actions/createProduct";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+const CATEGORIES = ["CLOTHING", "SHOES", "ACCESSORIES", "BAGS", "OTHER"] as const;
+
+export function CreateProductForm() {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [state, setState] = useState<{ error?: string; productId?: number } | null>(null);
+  const [isPending, setIsPending] = useState(false);
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    setFiles((prev) => [...prev, ...acceptedFiles]);
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "image/*": [".png", ".jpg", ".jpeg", ".webp", ".gif"],
+    },
+    maxSize: 5 * 1024 * 1024,
+  });
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!formRef.current) return;
+    setIsPending(true);
+    setState(null);
+    const formData = new FormData(formRef.current);
+    files.forEach((file) => formData.append("images", file));
+    const result = await createProduct(formData);
+    setState(result);
+    setIsPending(false);
+    if (result.productId) {
+      router.push("/shop");
+    }
+  }
+
+  if (state?.productId) {
+    return null;
+  }
+
+  return (
+    <form ref={formRef} onSubmit={handleSubmit}>
+      <Card className="max-w-2xl">
+        <CardHeader>
+          <CardTitle>Product details</CardTitle>
+          <CardDescription>Add a new product to your store</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input id="name" name="name" required placeholder="Product name" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <textarea
+              id="description"
+              name="description"
+              rows={3}
+              className="border-input w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="Product description"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="price">Price</Label>
+              <Input
+                id="price"
+                name="price"
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                placeholder="0.00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <select
+                id="category"
+                name="category"
+                required
+                className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Select category</option>
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat.charAt(0) + cat.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="isVisible"
+              name="isVisible"
+              value="true"
+              defaultChecked
+              className="h-4 w-4 rounded border-input"
+            />
+            <Label htmlFor="isVisible" className="font-normal">
+              Visible in store
+            </Label>
+          </div>
+          <div className="space-y-2">
+            <Label>Images</Label>
+            <div
+              {...getRootProps()}
+              className={cn(
+                "border-input flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed p-4 transition-colors",
+                isDragActive ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+              )}
+            >
+              <input {...getInputProps()} />
+              <p className="text-center text-sm text-muted-foreground">
+                {isDragActive
+                  ? "Drop images here..."
+                  : "Drag & drop images here, or click to select"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                PNG, JPG, WebP, GIF up to 5MB
+              </p>
+            </div>
+            {files.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {files.map((file, i) => (
+                  <li
+                    key={i}
+                    className="flex items-center justify-between rounded bg-muted px-2 py-1 text-sm"
+                  >
+                    {file.name}
+                    <button
+                      type="button"
+                      onClick={() => removeFile(i)}
+                      className="text-destructive hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {state?.error && (
+            <p className="text-sm text-destructive">{state.error}</p>
+          )}
+          <div className="flex gap-4">
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Creating…" : "Create product"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+            >
+              Cancel
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </form>
+  );
+}

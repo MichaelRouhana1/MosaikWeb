@@ -1,0 +1,573 @@
+"use client";
+
+import { useState, useCallback, useRef, useEffect } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import { useCart } from "@/context/CartContext";
+import { toggleWishlist } from "@/actions/toggleWishlist";
+import { ProductCard } from "@/components/ProductCard";
+import type { Product } from "@/db/schema";
+import type { ProductVariant } from "@/db/schema";
+
+const DEFAULT_SIZES = ["XS", "S", "M", "L", "XL"];
+const PEXELS_PREFIX = "https://images.pexels.com/";
+
+interface ProductDetailClientProps {
+  product: Product;
+  variants: ProductVariant[];
+  inWishlist: boolean;
+  similarProducts: Product[];
+  variantsByProductId: Record<number, ProductVariant[]>;
+  wishlistProductIds: number[];
+}
+
+export function ProductDetailClient({
+  product,
+  variants,
+  inWishlist: initialInWishlist,
+  similarProducts,
+  variantsByProductId,
+  wishlistProductIds,
+}: ProductDetailClientProps) {
+  const router = useRouter();
+  const { isSignedIn } = useAuth();
+  const { addToCart, openCart } = useCart();
+  const [wishlistState, setWishlistState] = useState(initialInWishlist);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [mainImageIndex, setMainImageIndex] = useState(0);
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxZoomed, setLightboxZoomed] = useState(false);
+  const lightboxScrollRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+
+  const imageUrls = product.images ?? [];
+  const hasMultipleImages = imageUrls.length >= 2;
+  const price = typeof product.price === "string" ? product.price : String(product.price);
+
+  const variantMap = new Map(variants.map((v) => [v.size, v]));
+  const sizes =
+    variants.length > 0
+      ? [...new Set(variants.map((v) => v.size))].sort(
+          (a, b) => DEFAULT_SIZES.indexOf(a) - DEFAULT_SIZES.indexOf(b)
+        )
+      : DEFAULT_SIZES;
+
+  const getStockForSize = (size: string) => variantMap.get(size)?.stock ?? 0;
+  const isSizeInStock = (size: string) => getStockForSize(size) > 0;
+  const hasAnyInStock = sizes.some(isSizeInStock);
+  const canAddToCart = selectedSize != null && isSizeInStock(selectedSize);
+
+  const handleImageError = (index: number) => {
+    setImageErrors((prev) => ({ ...prev, [index]: true }));
+  };
+
+  const goToPrevImage = () => {
+    setMainImageIndex((i) => (i - 1 + imageUrls.length) % imageUrls.length);
+  };
+
+  const goToNextImage = () => {
+    setMainImageIndex((i) => (i + 1) % imageUrls.length);
+  };
+
+  const openLightbox = () => {
+    setLightboxIndex(mainImageIndex);
+    setLightboxZoomed(false);
+    setLightboxOpen(true);
+  };
+
+  const closeLightbox = useCallback(() => {
+    setMainImageIndex(lightboxIndex);
+    setLightboxOpen(false);
+    setLightboxZoomed(false);
+  }, [lightboxIndex]);
+
+  const lightboxPrev = useCallback(() => {
+    setLightboxIndex((i) => (i - 1 + imageUrls.length) % imageUrls.length);
+    setLightboxZoomed(false);
+    lightboxScrollRef.current?.scrollTo(0, 0);
+  }, [imageUrls.length]);
+
+  const lightboxNext = useCallback(() => {
+    setLightboxIndex((i) => (i + 1) % imageUrls.length);
+    setLightboxZoomed(false);
+    lightboxScrollRef.current?.scrollTo(0, 0);
+  }, [imageUrls.length]);
+
+  const handleLightboxDragStart = useCallback((clientX: number, clientY: number) => {
+    const el = lightboxScrollRef.current;
+    if (!el || !lightboxZoomed) return;
+    dragRef.current = { x: clientX, y: clientY, scrollLeft: el.scrollLeft, scrollTop: el.scrollTop };
+  }, [lightboxZoomed]);
+
+  const handleLightboxDragMove = useCallback((clientX: number, clientY: number) => {
+    const d = dragRef.current;
+    const el = lightboxScrollRef.current;
+    if (!d || !el) return;
+    el.scrollLeft = d.scrollLeft + d.x - clientX;
+    el.scrollTop = d.scrollTop + d.y - clientY;
+  }, []);
+
+  const handleLightboxDragEnd = useCallback(() => {
+    dragRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeLightbox();
+      if (e.key === "ArrowLeft") lightboxPrev();
+      if (e.key === "ArrowRight") lightboxNext();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [lightboxOpen, closeLightbox, lightboxPrev, lightboxNext]);
+
+  const handleWishlistClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isSignedIn) {
+      router.push("/sign-in");
+      return;
+    }
+    const result = await toggleWishlist(product.id);
+    if (result.error) {
+      router.push("/sign-in");
+      return;
+    }
+    setWishlistState(result.inWishlist ?? false);
+    router.refresh();
+  };
+
+  const handleAddToBag = () => {
+    if (!selectedSize || !isSizeInStock(selectedSize)) return;
+    addToCart({
+      productId: product.id,
+      size: selectedSize,
+      quantity: 1,
+      priceAtPurchase: price,
+      productName: product.name,
+      productImage: product.images?.[0],
+      productColor: product.color ?? undefined,
+    });
+    openCart();
+  };
+
+  const mainSrc =
+    imageUrls[mainImageIndex] && !imageErrors[mainImageIndex]
+      ? imageUrls[mainImageIndex]
+      : null;
+
+  return (
+    <main className="w-full max-w-[1400px] mx-auto px-6 py-12">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+        {/* Image gallery */}
+        <div className="flex flex-col gap-4">
+          <div
+            className="relative aspect-[2/3] overflow-hidden bg-muted group cursor-pointer"
+            onClick={openLightbox}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === "Enter" && openLightbox()}
+            aria-label="View full image"
+          >
+            {mainSrc ? (
+              <Image
+                src={mainSrc}
+                alt={product.name}
+                fill
+                className="object-cover"
+                onError={() => handleImageError(mainImageIndex)}
+                unoptimized={!mainSrc.startsWith(PEXELS_PREFIX)}
+                sizes="(max-width: 1024px) 100vw, 50vw"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                No image
+              </div>
+            )}
+
+            {/* Wishlist heart */}
+            <button
+              type="button"
+              onClick={handleWishlistClick}
+              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-white/90 dark:bg-black/60 text-foreground hover:bg-white dark:hover:bg-black/80 transition-colors z-10"
+              aria-label={wishlistState ? "Remove from favorites" : "Add to favorites"}
+            >
+              {wishlistState ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+              )}
+            </button>
+
+            {hasMultipleImages && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToPrevImage();
+                  }}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-white/80 dark:bg-black/60 text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-white dark:hover:bg-black/80"
+                  aria-label="Previous image"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToNextImage();
+                  }}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-white/80 dark:bg-black/60 text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-white dark:hover:bg-black/80"
+                  aria-label="Next image"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Lightbox overlay */}
+          {lightboxOpen && (
+            <div
+              className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+              aria-modal="true"
+              role="dialog"
+              aria-label="Image gallery"
+            >
+              <button
+                type="button"
+                onClick={closeLightbox}
+                className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-white/80 hover:text-white transition-colors z-10"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <div className="flex items-center gap-4 w-full max-w-[95vw] max-h-[90vh] px-4">
+                {/* Vertical thumbnail strip */}
+                <div className="flex flex-col gap-2 overflow-y-auto max-h-[90vh] py-2 shrink-0 scrollbar-hide w-16">
+                  {imageUrls.map((url, idx) => {
+                    const isSelected = lightboxIndex === idx;
+                    const hasError = imageErrors[idx];
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLightboxIndex(idx);
+                          setLightboxZoomed(false);
+                          lightboxScrollRef.current?.scrollTo(0, 0);
+                        }}
+                        className={`flex-shrink-0 w-16 h-20 overflow-hidden transition-all duration-200 ${
+                          isSelected
+                            ? "ring-2 ring-white ring-offset-2 ring-offset-black opacity-100"
+                            : "opacity-60 hover:opacity-80 border border-white/20 hover:border-white/40"
+                        }`}
+                      >
+                        {!hasError && url ? (
+                          <Image
+                            src={url}
+                            alt=""
+                            width={64}
+                            height={80}
+                            className="w-full h-full object-cover"
+                            unoptimized={!url.startsWith(PEXELS_PREFIX)}
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">
+                            —
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Main image area - px-16 reserves safe area for arrows (w-12 = 48px + 16px margin) */}
+                <div className="relative flex-1 min-w-0 flex items-center justify-center min-h-0 overflow-hidden">
+                  <div
+                    ref={lightboxScrollRef}
+                    className={`w-full h-[85vh] overflow-auto overscroll-contain select-none scrollbar-hide px-16 ${
+                      lightboxZoomed
+                        ? "flex items-start justify-start cursor-grab active:cursor-grabbing touch-none"
+                        : "flex items-center justify-center"
+                    }`}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      if (lightboxZoomed) handleLightboxDragStart(e.clientX, e.clientY);
+                    }}
+                    onMouseMove={(e) => {
+                      if (dragRef.current) {
+                        e.preventDefault();
+                        handleLightboxDragMove(e.clientX, e.clientY);
+                      }
+                    }}
+                    onMouseUp={() => handleLightboxDragEnd()}
+                    onMouseLeave={() => handleLightboxDragEnd()}
+                    onTouchStart={(e) => {
+                      if (lightboxZoomed && e.touches.length === 1) {
+                        handleLightboxDragStart(e.touches[0].clientX, e.touches[0].clientY);
+                      }
+                    }}
+                    onTouchMove={(e) => {
+                      if (dragRef.current && e.touches.length === 1) {
+                        e.preventDefault();
+                        handleLightboxDragMove(e.touches[0].clientX, e.touches[0].clientY);
+                      }
+                    }}
+                    onTouchEnd={() => handleLightboxDragEnd()}
+                  >
+                    <div
+                      className={`flex items-center justify-center ${lightboxZoomed ? "min-w-[110%] min-h-[110%] shrink-0" : ""}`}
+                    >
+                      {imageUrls[lightboxIndex] && !imageErrors[lightboxIndex] ? (
+                        <Image
+                          src={imageUrls[lightboxIndex]}
+                          alt={product.name}
+                          width={1200}
+                          height={1600}
+                          className={`object-contain select-none pointer-events-none ${
+                            lightboxZoomed ? "w-[110%] h-[110%]" : "max-w-full max-h-[85vh]"
+                          }`}
+                          unoptimized={!imageUrls[lightboxIndex].startsWith(PEXELS_PREFIX)}
+                        />
+                      ) : (
+                        <div className="w-96 h-96 bg-muted flex items-center justify-center text-muted-foreground">
+                          No image
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {imageUrls.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          lightboxPrev();
+                        }}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center text-white/80 hover:text-white transition-colors z-10"
+                        aria-label="Previous image"
+                      >
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          lightboxNext();
+                        }}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center text-white/80 hover:text-white transition-colors z-10"
+                        aria-label="Next image"
+                      >
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightboxZoomed((z) => !z);
+                      requestAnimationFrame(() => lightboxScrollRef.current?.scrollTo(0, 0));
+                    }}
+                    className="absolute bottom-0 right-0 w-12 h-12 flex items-center justify-center bg-white/20 hover:bg-white/30 text-white rounded-none z-10 transition-colors"
+                    aria-label={lightboxZoomed ? "Zoom out" : "Zoom in"}
+                  >
+                    {lightboxZoomed ? (
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                      </svg>
+                    ) : (
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Thumbnail grid */}
+          {hasMultipleImages && (
+            <div className="grid grid-cols-2 gap-4">
+              {imageUrls.slice(1).map((url, i) => {
+                const idx = i + 1;
+                const hasError = imageErrors[idx];
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setMainImageIndex(idx)}
+                    className={`relative aspect-[2/3] overflow-hidden bg-muted border-2 transition-colors ${
+                      mainImageIndex === idx
+                        ? "border-foreground"
+                        : "border-transparent"
+                    }`}
+                  >
+                    {!hasError && url ? (
+                      <Image
+                        src={url}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        onError={() => handleImageError(idx)}
+                        unoptimized={!url.startsWith(PEXELS_PREFIX)}
+                        sizes="200px"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-muted-foreground text-sm">
+                        —
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Product info */}
+        <div className="flex flex-col">
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="text-xl font-normal text-foreground uppercase tracking-widest">
+              {product.name.toUpperCase()}
+            </h1>
+            <button
+              type="button"
+              onClick={handleWishlistClick}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Add to favorites"
+            >
+              <svg className="w-5 h-5" fill={wishlistState ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </button>
+          </div>
+
+          {product.color && (
+            <p className="mt-2 text-sm text-muted-foreground">{product.color}</p>
+          )}
+
+          {imageUrls[0] && (
+            <div className="mt-4 aspect-square w-16 h-16 overflow-hidden border border-border">
+              <Image
+                src={imageUrls[0]}
+                alt=""
+                width={64}
+                height={64}
+                className="w-full h-full object-cover"
+                unoptimized={!imageUrls[0].startsWith(PEXELS_PREFIX)}
+              />
+            </div>
+          )}
+
+          <p className="mt-6 text-lg font-normal text-foreground">${price}</p>
+
+          <div className="mt-8">
+            <p className="text-xs font-medium uppercase tracking-widest text-foreground mb-3">Size</p>
+            <div className="flex flex-wrap gap-2">
+              {sizes.map((size) => {
+                const inStock = isSizeInStock(size);
+                return (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => inStock && setSelectedSize(size)}
+                    disabled={!inStock}
+                    className={`w-12 h-12 rounded-full text-xs font-medium uppercase tracking-widest transition-colors ${
+                      !inStock
+                        ? "border border-border text-muted-foreground opacity-60 cursor-not-allowed line-through"
+                        : selectedSize === size
+                          ? "bg-foreground text-background"
+                          : "border border-border text-foreground hover:border-foreground"
+                    }`}
+                  >
+                    {size}
+                  </button>
+                );
+              })}
+            </div>
+            <Link
+              href="#"
+              className="mt-2 inline-block text-xs font-normal text-muted-foreground hover:text-foreground underline underline-offset-2"
+            >
+              Size guide
+            </Link>
+          </div>
+
+          {!hasAnyInStock && (
+            <p className="mt-4 text-sm text-destructive">This product is currently out of stock.</p>
+          )}
+
+          <button
+            type="button"
+            onClick={handleAddToBag}
+            disabled={!canAddToCart}
+            className="mt-10 w-full py-4 text-xs font-medium uppercase tracking-widest text-background bg-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Add to bag
+          </button>
+          {!selectedSize && hasAnyInStock && (
+            <p className="mt-2 text-xs text-muted-foreground">Please select a size</p>
+          )}
+
+          <p className="mt-6 text-sm font-light text-muted-foreground">
+            Free pickup at: MOSAIK
+          </p>
+
+          {product.description && (
+            <p className="mt-6 text-sm text-muted-foreground">{product.description}</p>
+          )}
+        </div>
+      </div>
+
+      {similarProducts.length > 0 && (
+        <section className="mt-24 pt-16 border-t border-border">
+          <h2 className="text-sm font-medium text-foreground tracking-[0.2em] uppercase mb-8">
+            Similar Items
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {similarProducts.map((p) => (
+              <div key={p.id} className="min-w-0">
+                <ProductCard
+                  product={p}
+                  variants={variantsByProductId[p.id] ?? []}
+                  inWishlist={wishlistProductIds.includes(p.id)}
+                  compact
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </main>
+  );
+}

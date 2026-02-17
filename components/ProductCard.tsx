@@ -1,56 +1,264 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import { toggleWishlist } from "@/actions/toggleWishlist";
+import { useCart } from "@/context/CartContext";
 import type { Product } from "@/db/schema";
+import type { ProductVariant } from "@/db/schema";
+
+const DEFAULT_SIZES = ["XS", "S", "M", "L", "XL"];
+const PEXELS_PREFIX = "https://images.pexels.com/";
 
 interface ProductCardProps {
   product: Product;
+  variants?: ProductVariant[];
+  inWishlist?: boolean;
+  compact?: boolean;
 }
 
-export function ProductCard({ product }: ProductCardProps) {
-  const imageUrl = product.images?.[0];
+export function ProductCard({
+  product,
+  variants = [],
+  inWishlist = false,
+  compact = false,
+}: ProductCardProps) {
+  const router = useRouter();
+  const { isSignedIn } = useAuth();
+  const { addToCart, openCart } = useCart();
+  const [wishlistState, setWishlistState] = useState(inWishlist);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const imageUrls = product.images ?? [];
+  const hasMultipleImages = imageUrls.length > 1;
+  const currentImage = imageUrls[currentImageIndex];
   const price = typeof product.price === "string" ? product.price : String(product.price);
 
+  const variantMap = new Map(variants.map((v) => [v.size, v]));
+  const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
+  const isOutOfStock = totalStock === 0;
+  const isSizeInStock = (size: string) => (variantMap.get(size)?.stock ?? 0) > 0;
+
+  const sizes =
+    variants.length > 0
+      ? [...new Set(variants.map((v) => v.size))].sort(
+          (a, b) => DEFAULT_SIZES.indexOf(a) - DEFAULT_SIZES.indexOf(b)
+        )
+      : DEFAULT_SIZES;
+
+  const handleWishlistClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isSignedIn) {
+      router.push("/sign-in");
+      return;
+    }
+    const result = await toggleWishlist(product.id);
+    if (result.error) {
+      router.push("/sign-in");
+      return;
+    }
+    setWishlistState(result.inWishlist ?? false);
+    router.refresh();
+  };
+
+  const goToPrevImage = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex((i) => (i - 1 + imageUrls.length) % imageUrls.length);
+  };
+
+  const goToNextImage = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex((i) => (i + 1) % imageUrls.length);
+  };
+
+  const handleSizeClick = (e: React.MouseEvent, size: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isSizeInStock(size)) return;
+    addToCart({
+      productId: product.id,
+      size,
+      quantity: 1,
+      priceAtPurchase: price,
+      productName: product.name,
+      productImage: product.images?.[0],
+      productColor: product.color ?? undefined,
+    });
+    openCart();
+  };
+
+  const colorLabel = product.color ?? product.description?.split(",")[0] ?? product.category ?? "—";
+
   return (
-    <Link href={`/shop/${product.id}`}>
-      <Card className="overflow-hidden transition-shadow hover:shadow-md">
-        <CardHeader className="p-0">
-          <div className="relative aspect-square w-full bg-muted">
-            {imageUrl ? (
-              <Image
-                src={imageUrl}
-                alt={product.name}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                <span className="text-sm">No image</span>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {product.category}
-          </p>
-          <h3 className="mt-1 font-semibold">{product.name}</h3>
-          {product.description && (
-            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-              {product.description}
-            </p>
+    <article
+      className={`group overflow-hidden ${compact ? "text-[0.85em]" : ""}`}
+    >
+      <Link href={`/shop/${product.id}`} className="block">
+        <div
+          className={`relative aspect-[2/3] overflow-hidden bg-muted ${
+            compact ? "" : ""
+          }`}
+        >
+          {currentImage ? (
+            <Image
+              src={currentImage}
+              alt={product.name}
+              fill
+              className={`object-cover transition-opacity duration-200 ${
+                isOutOfStock ? "opacity-70" : ""
+              }`}
+              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+              unoptimized={!currentImage.startsWith(PEXELS_PREFIX)}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <span className="text-sm">No image</span>
+            </div>
           )}
-        </CardContent>
-        <CardFooter className="p-4 pt-0">
-          <p className="font-semibold">${price}</p>
-        </CardFooter>
-      </Card>
-    </Link>
+
+          {/* Wishlist heart - theme-aware */}
+          <button
+            type="button"
+            onClick={handleWishlistClick}
+            className={`absolute top-2 right-2 z-10 flex items-center justify-center bg-card/90 dark:bg-card/90 text-foreground hover:opacity-90 transition-colors ${
+              compact ? "w-8 h-8" : "w-10 h-10"
+            }`}
+            aria-label={wishlistState ? "Remove from favorites" : "Add to favorites"}
+          >
+            {wishlistState ? (
+              <svg
+                className={compact ? "w-4 h-4" : "w-5 h-5"}
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+            ) : (
+              <svg
+                className={compact ? "w-4 h-4" : "w-5 h-5"}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+            )}
+          </button>
+
+          {isOutOfStock && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+              <span className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground bg-primary/90 backdrop-blur-sm">
+                Out of stock
+              </span>
+            </div>
+          )}
+
+          {/* Image navigation arrows */}
+          {hasMultipleImages && (
+            <>
+              <button
+                type="button"
+                onClick={goToPrevImage}
+                className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center bg-card/80 dark:bg-card/80 text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:opacity-100 ${
+                  compact ? "w-8 h-8" : "w-10 h-10"
+                }`}
+                aria-label="Previous image"
+              >
+                <svg
+                  className={compact ? "w-4 h-4" : "w-5 h-5"}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={goToNextImage}
+                className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center bg-card/80 dark:bg-card/80 text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:opacity-100 ${
+                  compact ? "w-8 h-8" : "w-10 h-10"
+                }`}
+                aria-label="Next image"
+              >
+                <svg
+                  className={compact ? "w-4 h-4" : "w-5 h-5"}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </>
+          )}
+
+          {/* Size selection overlay - theme-aware for dark mode */}
+          {!isOutOfStock && (
+            <div
+              className={`absolute inset-x-0 bottom-0 bg-card border-t border-border opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${
+                compact ? "p-2" : "p-4"
+              }`}
+            >
+              <p className="text-xs font-medium uppercase tracking-widest text-foreground mb-2">
+                Select size
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {sizes.map((size) => {
+                  const inStock = isSizeInStock(size);
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={(e) => handleSizeClick(e, size)}
+                      disabled={!inStock}
+                      className={`px-3 py-1.5 text-xs font-medium uppercase tracking-widest transition-colors ${
+                        inStock
+                          ? "border border-foreground text-foreground hover:bg-foreground hover:text-primary-foreground"
+                          : "border border-muted-foreground/40 text-muted-foreground/60 opacity-60 cursor-not-allowed line-through"
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className={compact ? "mt-2" : "mt-3"}>
+          <h3
+            className={`font-light text-foreground truncate ${
+              compact ? "text-xs" : "text-sm"
+            }`}
+          >
+            {product.name}
+          </h3>
+          <p className="text-xs font-light text-muted-foreground mt-0.5">
+            {colorLabel}
+          </p>
+          <p className="text-sm font-light text-foreground mt-0.5">
+            ${price}
+          </p>
+        </div>
+      </Link>
+    </article>
   );
 }

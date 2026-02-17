@@ -14,19 +14,61 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ImageCropModal } from "@/components/ImageCropModal";
 import { cn } from "@/lib/utils";
 
-const CATEGORIES = ["CLOTHING", "SHOES", "ACCESSORIES", "BAGS", "OTHER"] as const;
+const CATEGORIES = [
+  { value: "trousers", label: "Trousers" },
+  { value: "shirts", label: "Shirts" },
+  { value: "tshirts", label: "T-Shirts" },
+  { value: "hoodies", label: "Hoodies" },
+  { value: "jackets", label: "Jackets & Coats" },
+  { value: "jeans", label: "Jeans" },
+] as const;
+
+const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
 export function CreateProductForm() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [stockBySize, setStockBySize] = useState<Record<string, number>>(
+    Object.fromEntries(SIZES.map((s) => [s, 0]))
+  );
   const [state, setState] = useState<{ error?: string; productId?: number } | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [cropFile, setCropFile] = useState<{ file: File; objectUrl: string } | null>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    setFiles((prev) => [...prev, ...acceptedFiles]);
+    if (acceptedFiles.length === 1) {
+      const file = acceptedFiles[0];
+      const url = URL.createObjectURL(file);
+      setCropFile({ file, objectUrl: url });
+    } else if (acceptedFiles.length > 1) {
+      setFiles((prev) => [...prev, ...acceptedFiles]);
+    }
+  }, []);
+
+  const cropFileRef = useRef<{ file: File; objectUrl: string } | null>(null);
+  cropFileRef.current = cropFile;
+
+  const handleCropComplete = useCallback((blob: Blob) => {
+    const current = cropFileRef.current;
+    if (!current) return;
+    URL.revokeObjectURL(current.objectUrl);
+    const file = new File([blob], current.file.name.replace(/\.[^.]+$/, ".jpg"), {
+      type: "image/jpeg",
+    });
+    setFiles((prev) => [...prev, file]);
+    setCropFile(null);
+  }, []);
+
+  const handleCropCancel = useCallback(() => {
+    const current = cropFileRef.current;
+    if (current) {
+      URL.revokeObjectURL(current.objectUrl);
+      setCropFile(null);
+    }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -48,11 +90,13 @@ export function CreateProductForm() {
     setState(null);
     const formData = new FormData(formRef.current);
     files.forEach((file) => formData.append("images", file));
+    SIZES.forEach((size) => formData.append(`stock_${size}`, String(stockBySize[size] ?? 0)));
     const result = await createProduct(formData);
     setState(result);
     setIsPending(false);
     if (result.productId) {
-      router.push("/shop");
+      router.push("/admin/products");
+      router.refresh();
     }
   }
 
@@ -105,12 +149,20 @@ export function CreateProductForm() {
               >
                 <option value="">Select category</option>
                 {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat.charAt(0) + cat.slice(1).toLowerCase()}
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
                   </option>
                 ))}
               </select>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="color">Color</Label>
+            <Input
+              id="color"
+              name="color"
+              placeholder="e.g. Black, Navy, White"
+            />
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -164,8 +216,45 @@ export function CreateProductForm() {
               </ul>
             )}
           </div>
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-medium mb-1">Sizes & inventory</h3>
+              <p className="text-xs text-muted-foreground">
+                Set stock for each size. Use 0 if not stocked.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              {SIZES.map((size) => (
+                <div key={size} className="space-y-1.5 min-w-[80px]">
+                  <Label htmlFor={`stock_${size}`} className="text-xs">
+                    {size}
+                  </Label>
+                  <Input
+                    id={`stock_${size}`}
+                    type="number"
+                    min={0}
+                    value={stockBySize[size] ?? 0}
+                    onChange={(e) =>
+                      setStockBySize((prev) => ({
+                        ...prev,
+                        [size]: Math.max(0, parseInt(e.target.value, 10) || 0),
+                      }))
+                    }
+                    className="h-9"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
           {state?.error && (
             <p className="text-sm text-destructive">{state.error}</p>
+          )}
+          {cropFile && (
+            <ImageCropModal
+              imageSrc={cropFile.objectUrl}
+              onComplete={handleCropComplete}
+              onCancel={handleCropCancel}
+            />
           )}
           <div className="flex gap-4">
             <Button type="submit" disabled={isPending}>

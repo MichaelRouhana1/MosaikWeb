@@ -10,6 +10,7 @@ export default async function CheckoutSuccessPage({ searchParams }: SuccessPageP
   const orderId = params.orderId;
 
   return (
+    <div className="pt-14">
     <div className="container mx-auto flex max-w-md flex-col items-center gap-6 px-4 py-16 text-center">
       <h1 className="text-2xl font-bold">Order confirmed</h1>
       {orderId && (
@@ -20,6 +21,7 @@ export default async function CheckoutSuccessPage({ searchParams }: SuccessPageP
       <Button asChild>
         <Link href="/shop">Continue shopping</Link>
       </Button>
+    </div>
     </div>
   );
 }

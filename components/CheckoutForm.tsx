@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { placeOrder, type CartItem } from "@/actions/placeOrder";
+import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,10 +45,23 @@ function placeOrderAction(
 
 export function CheckoutForm({ cart }: CheckoutFormProps) {
   const router = useRouter();
+  const { clearOrderedItems } = useCart();
   const [state, formAction, isPending] = useActionState(placeOrderAction, null);
 
+  useEffect(() => {
+    if (state?.orderId) {
+      clearOrderedItems(
+        cart.map((i) => ({
+          productId: i.productId,
+          size: i.size,
+          quantity: i.quantity,
+        }))
+      );
+      router.push(`/checkout/success?orderId=${state.orderId}`);
+    }
+  }, [state?.orderId, cart, clearOrderedItems, router]);
+
   if (state?.orderId) {
-    router.push(`/checkout/success?orderId=${state.orderId}`);
     return null;
   }
 

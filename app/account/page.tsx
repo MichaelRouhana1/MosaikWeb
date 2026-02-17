@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { orders, orderItems, wishlists, products } from "@/db/schema";
+import { orders, orderItems, wishlists, products, productVariants } from "@/db/schema";
 import {
   Card,
   CardContent,
@@ -38,6 +38,23 @@ export default async function AccountPage() {
       .orderBy(desc(wishlists.createdAt)),
   ]);
 
+  const wishlistProductIds = userWishlist.map((w) => w.productId);
+  const wishlistVariants =
+    wishlistProductIds.length > 0
+      ? await db
+          .select()
+          .from(productVariants)
+          .where(inArray(productVariants.productId, wishlistProductIds))
+      : [];
+  const variantsByProductId = wishlistVariants.reduce<Record<number, typeof productVariants.$inferSelect[]>>(
+    (acc, v) => {
+      if (!acc[v.productId]) acc[v.productId] = [];
+      acc[v.productId].push(v);
+      return acc;
+    },
+    {}
+  );
+
   const ordersWithItems = await Promise.all(
     userOrders.map(async (order) => {
       const items = await db
@@ -55,6 +72,7 @@ export default async function AccountPage() {
   );
 
   return (
+    <div className="pt-14">
     <div className="container mx-auto max-w-4xl space-y-8 px-4 py-8">
       <h1 className="text-2xl font-bold">My Account</h1>
 
@@ -126,13 +144,19 @@ export default async function AccountPage() {
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {userWishlist.map(({ product }) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    variants={variantsByProductId[product.id] ?? []}
+                    inWishlist
+                  />
                 ))}
               </div>
             )}
           </CardContent>
         </Card>
       </section>
+    </div>
     </div>
   );
 }

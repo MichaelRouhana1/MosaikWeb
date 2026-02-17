@@ -3,11 +3,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { products } from "@/db/schema";
-import { getSupabaseAdmin } from "@/lib/supabase";
+import { products, productVariants } from "@/db/schema";
+import { uploadProductImage } from "@/lib/uploadImages";
 
-const BUCKET = "products";
-const VALID_CATEGORIES = ["CLOTHING", "SHOES", "ACCESSORIES", "BAGS", "OTHER"] as const;
+const VALID_CATEGORY_SLUGS = ["trousers", "shirts", "tshirts", "hoodies", "jackets", "jeans"] as const;
+const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
 export async function createProduct(formData: FormData): Promise<{ error?: string; productId?: number }> {
   const { userId, sessionClaims } = await auth();
@@ -18,12 +18,13 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
   const name = formData.get("name") as string;
   const description = (formData.get("description") as string) || null;
   const price = formData.get("price") as string;
-  const category = formData.get("category") as string;
+  const categorySlug = formData.get("category") as string;
+  const color = (formData.get("color") as string)?.trim() || null;
   const isVisible = formData.get("isVisible") === "true";
 
   if (!name?.trim()) return { error: "Name is required" };
   if (!price || isNaN(parseFloat(price))) return { error: "Valid price is required" };
-  if (!VALID_CATEGORIES.includes(category as (typeof VALID_CATEGORIES)[number])) {
+  if (!VALID_CATEGORY_SLUGS.includes(categorySlug as (typeof VALID_CATEGORY_SLUGS)[number])) {
     return { error: "Invalid category" };
   }
 
@@ -31,29 +32,12 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
   const files = formData.getAll("images") as File[];
 
   if (files.some((f) => f?.size)) {
-    const supabase = getSupabaseAdmin();
     for (const file of files) {
       if (!file?.size) continue;
-      const ext = file.name.split(".").pop() || "jpg";
-      const path = `product-images/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-      if (uploadError) {
-        console.error("Supabase upload error:", uploadError);
-        return { error: `Failed to upload ${file.name}: ${uploadError.message}` };
-      }
-
-      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      imageUrls.push(urlData.publicUrl);
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const result = await uploadProductImage(file, filename);
+      if (result.error) return { error: result.error };
+      imageUrls.push(result.url);
     }
   }
 
@@ -63,11 +47,25 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
       name: name.trim(),
       description: description?.trim() || null,
       price: parseFloat(price).toFixed(2),
-      category: category as (typeof VALID_CATEGORIES)[number],
+      category: "CLOTHING",
+      categorySlug: categorySlug as (typeof VALID_CATEGORY_SLUGS)[number],
+      color,
       images: imageUrls,
       isVisible,
     })
     .returning({ id: products.id });
+
+  const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  for (const size of SIZES) {
+    const stock = Math.max(0, parseInt(String(formData.get(`stock_${size}`)), 10) || 0);
+    const sku = `${slug}-${size}-${Date.now()}`;
+    await db.insert(productVariants).values({
+      productId: product.id,
+      size,
+      stock,
+      sku,
+    });
+  }
 
   return { productId: product.id };
 }

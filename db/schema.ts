@@ -27,13 +27,15 @@ export const orderStatusEnum = pgEnum("order_status", [
   "CANCELLED",
 ]);
 
-// Products
+// Products - category_slug matches landing page: trousers, shirts, tshirts, hoodies, jackets, jeans
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   category: productCategoryEnum("category").notNull(),
+  categorySlug: text("category_slug"),
+  color: text("color"),
   images: text("images").array().notNull().default([]),
   isVisible: boolean("is_visible").notNull().default(true),
 });

@@ -4,6 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { products } from "@/db/schema";
 import { getHeroImages } from "@/actions/hero";
+import { getHomeVideo } from "@/actions/video";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { VideoMuteToggle } from "@/components/VideoMuteToggle";
 import { NewsletterForm } from "@/components/NewsletterForm";
@@ -31,7 +32,7 @@ const LOOKS = [
 ];
 
 export default async function HomePage() {
-  const [discoverProducts, heroImages] = await Promise.all([
+  const [discoverProducts, heroImages, homeVideo] = await Promise.all([
     db
       .select()
       .from(products)
@@ -39,6 +40,7 @@ export default async function HomePage() {
       .orderBy(desc(products.id))
       .limit(8),
     getHeroImages(),
+    getHomeVideo(),
   ]);
 
   return (
@@ -106,7 +108,7 @@ export default async function HomePage() {
               Designed to work together.
             </p>
           </div>
-          <VideoMuteToggle videoSrc="/images/copy_1FA36497-0DD6-4C57-B22C-B21E1C628908.MOV" />
+          <VideoMuteToggle videoSrc={homeVideo?.videoUrl ?? "/images/copy_1FA36497-0DD6-4C57-B22C-B21E1C628908.MOV"} />
         </div>
       </section>
 

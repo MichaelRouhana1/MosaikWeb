@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
@@ -9,7 +9,8 @@ import { addHeroImageFromFile, deleteHeroImage } from "@/actions/hero";
 import { Button } from "@/components/ui/button";
 import type { HeroImage } from "@/db/schema";
 
-const HERO_ASPECT = 16 / 9;
+/** Matches hero carousel: width / 75vh. From user's viewport ~1567×544: aspect ≈ 2.88. Use 72/25 ≈ 2.88 */
+const HERO_ASPECT = 72 / 25;
 
 interface HeroAdminClientProps {
   images: HeroImage[];
@@ -24,6 +25,10 @@ export function HeroAdminClient({ images: initialImages }: HeroAdminClientProps)
 
   const cropFileRef = useRef<{ file: File; objectUrl: string } | null>(null);
   cropFileRef.current = cropFile;
+
+  useEffect(() => {
+    setImages(initialImages);
+  }, [initialImages]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length >= 1) {
@@ -150,7 +155,7 @@ export function HeroAdminClient({ images: initialImages }: HeroAdminClientProps)
           onComplete={handleCropComplete}
           onCancel={handleCropCancel}
           aspect={HERO_ASPECT}
-          title="Crop hero image (16:9)"
+          title="Crop hero image (matches hero display)"
         />
       )}
     </div>

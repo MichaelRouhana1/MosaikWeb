@@ -93,3 +93,48 @@ export async function uploadHeroImage(
   console.error("Supabase upload error:", uploadError);
   return { url: "", error: `Failed to upload ${file.name}: ${uploadError.message}` };
 }
+
+const VIDEO_STORAGE_PATH = "home-video";
+
+/**
+ * Uploads a home page video to Supabase storage. Falls back to public/images/home-video/ when bucket is missing.
+ */
+export async function uploadHomeVideo(
+  file: File,
+  filename: string
+): Promise<{ url: string; error?: string }> {
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  const ext = file.name.split(".").pop()?.toLowerCase() || "mp4";
+  const storagePath = `${VIDEO_STORAGE_PATH}/${filename}.${ext}`;
+
+  const supabase = getSupabaseAdmin();
+  const { error: uploadError } = await supabase.storage
+    .from(BUCKET)
+    .upload(storagePath, buffer, {
+      contentType: file.type,
+      upsert: false,
+    });
+
+  if (!uploadError) {
+    const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+    return { url: urlData.publicUrl };
+  }
+
+  if (uploadError.message?.includes("Bucket not found") || uploadError.message?.includes("404")) {
+    try {
+      const publicDir = path.join(process.cwd(), "public", "images", VIDEO_STORAGE_PATH);
+      fs.mkdirSync(publicDir, { recursive: true });
+      const localPath = path.join(publicDir, `${filename}.${ext}`);
+      fs.writeFileSync(localPath, buffer);
+      const url = `/images/${VIDEO_STORAGE_PATH}/${filename}.${ext}`;
+      return { url };
+    } catch (err) {
+      console.error("Local upload fallback error:", err);
+      return { url: "", error: `Failed to save ${file.name}: ${err instanceof Error ? err.message : "Unknown error"}` };
+    }
+  }
+
+  console.error("Supabase upload error:", uploadError);
+  return { url: "", error: `Failed to upload ${file.name}: ${uploadError.message}` };
+}

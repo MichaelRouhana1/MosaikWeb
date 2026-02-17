@@ -103,6 +103,15 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   product: one(products),
 }));
 
+// Home page video (single video for editorial section)
+export const homeVideo = pgTable("home_video", {
+  id: serial("id").primaryKey(),
+  videoUrl: text("video_url").notNull(),
+  caption: text("caption"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Hero images for slideshow
 export const heroImages = pgTable("hero_images", {
   id: serial("id").primaryKey(),
@@ -145,3 +154,6 @@ export type NewWishlist = typeof wishlists.$inferInsert;
 
 export type HeroImage = typeof heroImages.$inferSelect;
 export type NewHeroImage = typeof heroImages.$inferInsert;
+
+export type HomeVideo = typeof homeVideo.$inferSelect;
+export type NewHomeVideo = typeof homeVideo.$inferInsert;

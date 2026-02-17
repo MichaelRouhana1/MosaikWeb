@@ -3,6 +3,8 @@ import Link from "next/link";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { products } from "@/db/schema";
+import { getHeroImages } from "@/actions/hero";
+import { HeroCarousel } from "@/components/HeroCarousel";
 import { VideoMuteToggle } from "@/components/VideoMuteToggle";
 import { NewsletterForm } from "@/components/NewsletterForm";
 
@@ -29,40 +31,47 @@ const LOOKS = [
 ];
 
 export default async function HomePage() {
-  const discoverProducts = await db
-    .select()
-    .from(products)
-    .where(eq(products.isVisible, true))
-    .orderBy(desc(products.id))
-    .limit(8);
+  const [discoverProducts, heroImages] = await Promise.all([
+    db
+      .select()
+      .from(products)
+      .where(eq(products.isVisible, true))
+      .orderBy(desc(products.id))
+      .limit(8),
+    getHeroImages(),
+  ]);
 
   return (
     <div className="pt-14">
-      {/* Hero */}
-      <section className="w-full h-[75vh] flex items-center justify-center relative overflow-hidden">
-        <Image
-          src={PEXELS(3748221, 1920, 1080)}
-          alt=""
-          fill
-          className="object-cover"
-          priority
-          unoptimized
-        />
-        <div className="relative z-10 max-w-[36ch] text-center px-6">
-          <h1 className="text-xl font-normal text-foreground mb-4">
-            Clothing designed with intention.
-          </h1>
-          <p className="text-sm font-light text-foreground/90">
-            Modern silhouettes. Thoughtful materials. Built to last.
-          </p>
-          <Link
-            href="/shop"
-            className="inline-block mt-8 text-sm font-normal text-foreground border-b border-foreground pb-1 hover:opacity-60 transition-opacity duration-200"
-          >
-            Explore the collection
-          </Link>
-        </div>
-      </section>
+      {/* Hero - dynamic carousel or static fallback */}
+      {heroImages.length > 0 ? (
+        <HeroCarousel images={heroImages} />
+      ) : (
+        <section className="w-full min-h-[50vh] sm:min-h-[60vh] md:h-[75vh] flex items-center justify-center relative overflow-hidden">
+          <Image
+            src={PEXELS(3748221, 1920, 1080)}
+            alt=""
+            fill
+            className="object-cover"
+            priority
+            unoptimized
+          />
+          <div className="relative z-10 max-w-[36ch] text-center px-6">
+            <h1 className="text-xl font-normal text-foreground mb-4">
+              Clothing designed with intention.
+            </h1>
+            <p className="text-sm font-light text-foreground/90">
+              Modern silhouettes. Thoughtful materials. Built to last.
+            </p>
+            <Link
+              href="/shop"
+              className="inline-block mt-8 text-sm font-normal text-foreground border-b border-foreground pb-1 hover:opacity-60 transition-opacity duration-200"
+            >
+              Explore the collection
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* Category Grid */}
       <section className="py-24 px-6">

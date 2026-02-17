@@ -3,7 +3,6 @@
 import { useState, useCallback } from "react";
 import Cropper, { type Area } from "react-easy-crop";
 
-const ASPECT = 2 / 3;
 
 function createImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -48,12 +47,18 @@ interface ImageCropModalProps {
   imageSrc: string;
   onComplete: (blob: Blob) => void;
   onCancel: () => void;
+  /** Aspect ratio for crop (e.g. 16/9 for 16:9). Default 2/3 for product cards. */
+  aspect?: number;
+  /** Title shown in the modal header. */
+  title?: string;
 }
 
 export function ImageCropModal({
   imageSrc,
   onComplete,
   onCancel,
+  aspect = 2 / 3,
+  title = "Crop image (2:3 product card ratio)",
 }: ImageCropModalProps) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -82,7 +87,7 @@ export function ImageCropModal({
       <div className="bg-background w-full max-w-6xl h-[90vh] max-h-[900px] flex flex-col overflow-hidden border border-border">
         <div className="p-4 border-b border-border flex items-center justify-between">
           <h3 className="text-sm font-medium uppercase tracking-wider">
-            Crop image (2:3 product card ratio)
+            {title}
           </h3>
           <div className="flex gap-2">
             <button
@@ -107,7 +112,7 @@ export function ImageCropModal({
             image={imageSrc}
             crop={crop}
             zoom={zoom}
-            aspect={ASPECT}
+            aspect={aspect}
             zoomSpeed={0.1}
             onCropChange={setCrop}
             onZoomChange={setZoom}

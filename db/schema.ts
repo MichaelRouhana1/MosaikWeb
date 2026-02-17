@@ -103,6 +103,16 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   product: one(products),
 }));
 
+// Hero images for slideshow
+export const heroImages = pgTable("hero_images", {
+  id: serial("id").primaryKey(),
+  imageUrl: text("image_url").notNull(),
+  altText: text("alt_text"),
+  order: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Wishlists
 export const wishlists = pgTable("wishlists", {
   id: serial("id").primaryKey(),
@@ -132,3 +142,6 @@ export type NewOrderItem = typeof orderItems.$inferInsert;
 
 export type Wishlist = typeof wishlists.$inferSelect;
 export type NewWishlist = typeof wishlists.$inferInsert;
+
+export type HeroImage = typeof heroImages.$inferSelect;
+export type NewHeroImage = typeof heroImages.$inferInsert;

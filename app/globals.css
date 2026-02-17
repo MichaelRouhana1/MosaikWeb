@@ -141,3 +141,11 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+@keyframes hero-progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+.hero-progress-bar {
+  animation: hero-progress 5s linear forwards;
+}

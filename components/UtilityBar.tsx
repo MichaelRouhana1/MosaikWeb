@@ -49,7 +49,7 @@ export function UtilityBar({
         value={sort}
         onValueChange={(v) => onSortChange(v as SortOption)}
       >
-        <SelectTrigger className="w-[200px] border-0 shadow-none text-xs font-medium uppercase tracking-[0.2em] h-auto py-1">
+        <SelectTrigger className="min-w-[260px] w-auto border-0 shadow-none text-xs font-medium uppercase tracking-[0.2em] h-auto py-1">
           <SelectValue>Sort {SORT_LABELS[sort]}</SelectValue>
         </SelectTrigger>
         <SelectContent>

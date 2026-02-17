@@ -35,6 +35,9 @@ export function ProductDetailClient({
   const { isSignedIn } = useAuth();
   const { addToCart, openCart } = useCart();
   const [wishlistState, setWishlistState] = useState(initialInWishlist);
+  useEffect(() => {
+    setWishlistState(initialInWishlist);
+  }, [initialInWishlist]);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [mainImageIndex, setMainImageIndex] = useState(0);
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});

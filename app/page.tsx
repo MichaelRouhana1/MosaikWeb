@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { products } from "@/db/schema";
 import { getHeroImages } from "@/actions/hero";
 import { getHomeVideo } from "@/actions/video";
+import { getLookbookItems } from "@/actions/lookbook";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { VideoMuteToggle } from "@/components/VideoMuteToggle";
 import { NewsletterForm } from "@/components/NewsletterForm";
@@ -25,14 +26,8 @@ const CATEGORIES = [
   { label: "Jeans", image: "/images/jeans.png", href: "/shop?category=CLOTHING&cat=jeans" },
 ];
 
-const LOOKS = [
-  { label: "Everyday", image: "/images/everyday.png", href: "/shop" },
-  { label: "Tailored Casual", image: PEXELS(4611700, 600, 800), href: "/shop" },
-  { label: "Minimal Street", image: "/images/minimal-street.png", href: "/shop" },
-];
-
 export default async function HomePage() {
-  const [discoverProducts, heroImages, homeVideo] = await Promise.all([
+  const [discoverProducts, heroImages, homeVideo, lookbookItems] = await Promise.all([
     db
       .select()
       .from(products)
@@ -41,6 +36,7 @@ export default async function HomePage() {
       .limit(8),
     getHeroImages(),
     getHomeVideo(),
+    getLookbookItems(),
   ]);
 
   return (
@@ -117,19 +113,19 @@ export default async function HomePage() {
         <h2 className="text-sm font-medium text-foreground tracking-[0.2em] uppercase mb-12 text-center">
           Get the Look
         </h2>
-        <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide">
-          {LOOKS.map(({ label, image, href }) => (
-            <Link key={label} href={href} className="flex-shrink-0 w-[280px] group">
+        <div className="max-w-[1400px] mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
+          {lookbookItems.map((item) => (
+            <Link key={item.id} href={item.href} className="group">
               <div className="aspect-[3/4] overflow-hidden mb-4 relative">
                 <Image
-                  src={image}
-                  alt={label}
+                  src={item.imageUrl}
+                  alt={item.label}
                   fill
                   className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
-                  unoptimized={image.startsWith("https://")}
+                  unoptimized={item.imageUrl.startsWith("https://")}
                 />
               </div>
-              <p className="text-sm font-normal text-foreground">{label}</p>
+              <p className="text-sm font-normal text-foreground">{item.label}</p>
             </Link>
           ))}
         </div>

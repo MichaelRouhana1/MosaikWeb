@@ -112,6 +112,17 @@ export const homeVideo = pgTable("home_video", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Get the Look section - admin-managed categories
+export const lookbookItems = pgTable("lookbook_items", {
+  id: serial("id").primaryKey(),
+  label: text("label").notNull(),
+  imageUrl: text("image_url").notNull(),
+  href: text("href").notNull().default("/shop"),
+  order: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Hero images for slideshow
 export const heroImages = pgTable("hero_images", {
   id: serial("id").primaryKey(),
@@ -151,6 +162,9 @@ export type NewOrderItem = typeof orderItems.$inferInsert;
 
 export type Wishlist = typeof wishlists.$inferSelect;
 export type NewWishlist = typeof wishlists.$inferInsert;
+
+export type LookbookItem = typeof lookbookItems.$inferSelect;
+export type NewLookbookItem = typeof lookbookItems.$inferInsert;
 
 export type HeroImage = typeof heroImages.$inferSelect;
 export type NewHeroImage = typeof heroImages.$inferInsert;

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { db } from "@/db";
 import { orders, orderItems, products } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { UpdateOrderStatus } from "@/components/UpdateOrderStatus";
 
 export default async function AdminOrderDetailPage({
   params,
@@ -117,10 +118,11 @@ export default async function AdminOrderDetailPage({
           </div>
         </div>
 
-        <div>
-          <span className="inline-block px-2 py-0.5 rounded text-xs font-medium uppercase bg-muted">
-            {order.status}
-          </span>
+        <div className="border border-border rounded-md p-6">
+          <UpdateOrderStatus
+            orderId={order.id}
+            currentStatus={order.status}
+          />
         </div>
       </div>
     </div>

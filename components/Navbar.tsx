@@ -7,14 +7,8 @@ import { UserButton, useAuth } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import { useCart } from "@/context/CartContext";
 import { CartDrawer } from "@/components/CartDrawer";
-
-const NAV_LINKS = [
-  { label: "Shop", href: "/shop" },
-  { label: "New", href: "/shop?sort=newest" },
-  { label: "Collections", href: "/shop" },
-  { label: "Editorial", href: "/shop" },
-  { label: "About", href: "/about" },
-];
+import { getCategories } from "@/actions/categories";
+import type { ProductCategory } from "@/actions/categories";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -22,6 +16,9 @@ export function Navbar() {
   const { totalItems, setOpenCart } = useCart();
   const { theme, setTheme } = useTheme();
   const [cartOpen, setCartOpen] = useState(false);
+  const [burgerOpen, setBurgerOpen] = useState(false);
+  const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -30,6 +27,11 @@ export function Navbar() {
   useEffect(() => {
     setOpenCart(() => () => setCartOpen(true));
   }, [setOpenCart]);
+
+  useEffect(() => {
+    getCategories().then(setCategories);
+  }, []);
+
   const isAdmin = (sessionClaims?.metadata as { role?: string })?.role === "admin";
 
   if (pathname?.startsWith("/admin")) return null;
@@ -39,25 +41,77 @@ export function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="relative flex items-center justify-between h-14">
-          {/* Left: Primary navigation - flush left */}
-          <div className="flex items-center gap-6 sm:gap-8 shrink-0">
+          {/* Left: Burger + Primary navigation */}
+          <div className="flex items-center gap-4 sm:gap-6 lg:gap-8 shrink-0">
+            {/* Burger menu button - visible on smaller screens */}
+            <button
+              type="button"
+              onClick={() => setBurgerOpen((o) => !o)}
+              className="lg:hidden p-2 text-foreground hover:opacity-70 transition-opacity"
+              aria-label={burgerOpen ? "Close menu" : "Open menu"}
+              aria-expanded={burgerOpen}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {burgerOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
             {isAdmin && (
               <Link
                 href="/admin"
-                className="text-sm font-normal text-foreground hover:opacity-70 transition-opacity"
+                className="text-sm font-normal text-foreground hover:opacity-70 transition-opacity hidden sm:inline"
               >
                 Dashboard
               </Link>
             )}
-            {NAV_LINKS.map(({ label, href }) => (
-              <Link
-                key={label}
-                href={href}
+            {/* Shop dropdown - desktop only */}
+            <div className="relative hidden lg:block">
+              <button
+                type="button"
+                onClick={() => setShopDropdownOpen((o) => !o)}
                 className="text-sm font-normal text-foreground hover:opacity-70 transition-opacity"
+                aria-expanded={shopDropdownOpen}
+                aria-haspopup="true"
               >
-                {label}
-              </Link>
-            ))}
+                Shop
+              </button>
+              {shopDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShopDropdownOpen(false)}
+                    aria-hidden
+                  />
+                  <div
+                    className="absolute left-0 top-full mt-1 z-50 min-w-[200px] bg-background border border-border shadow-lg py-2"
+                    role="menu"
+                  >
+                    <Link
+                      href="/shop"
+                      onClick={() => setShopDropdownOpen(false)}
+                      className="block px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50"
+                      role="menuitem"
+                    >
+                      View all
+                    </Link>
+                    {categories.map((cat) => (
+                      <Link
+                        key={cat.id}
+                        href={`/shop?category=CLOTHING&cat=${cat.slug}`}
+                        onClick={() => setShopDropdownOpen(false)}
+                        className="block px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50"
+                        role="menuitem"
+                      >
+                        {cat.label}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Center: Logo */}
@@ -68,8 +122,8 @@ export function Navbar() {
             MOSAIK
           </Link>
 
-          {/* Right: Search, Theme toggle, Account, Cart - flush right */}
-          <div className="flex items-center gap-6 sm:gap-8 shrink-0">
+          {/* Right: Search, Theme toggle, Account, Cart - desktop only */}
+          <div className="hidden lg:flex items-center gap-6 sm:gap-8 shrink-0">
             <Link
               href="/shop"
               className="text-sm font-normal text-foreground hover:opacity-70 transition-opacity"
@@ -139,6 +193,107 @@ export function Navbar() {
           </div>
         </div>
       </div>
+
+      {/* Burger menu overlay */}
+      {burgerOpen && (
+        <>
+          <div
+            className="lg:hidden fixed inset-0 top-14 bg-black/20 z-40"
+            onClick={() => setBurgerOpen(false)}
+            aria-hidden
+          />
+          <div
+            className="lg:hidden absolute top-full left-0 right-0 z-50 bg-background border-b border-border shadow-lg max-h-[85vh] overflow-y-auto"
+            role="menu"
+          >
+            <div className="py-4 px-4 space-y-1">
+              <Link
+                href="/shop"
+                onClick={() => setBurgerOpen(false)}
+                className="block px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50"
+                role="menuitem"
+              >
+                View all
+              </Link>
+              {categories.map((cat) => (
+                <Link
+                  key={cat.id}
+                  href={`/shop?category=CLOTHING&cat=${cat.slug}`}
+                  onClick={() => setBurgerOpen(false)}
+                  className="block px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50"
+                  role="menuitem"
+                >
+                  {cat.label}
+                </Link>
+              ))}
+              <div className="border-t border-border my-3" />
+              <Link
+                href="/shop"
+                onClick={() => setBurgerOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50"
+                role="menuitem"
+              >
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+                Search
+              </Link>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50 text-left"
+                role="menuitem"
+                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {theme === "dark" ? (
+                  <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                )}
+                {theme === "dark" ? "Light mode" : "Dark mode"}
+              </button>
+              <Link
+                href="/account"
+                onClick={() => setBurgerOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50"
+                role="menuitem"
+              >
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+                Account
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setCartOpen(true);
+                  setBurgerOpen(false);
+                }}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50 text-left"
+                role="menuitem"
+                aria-label="Cart"
+              >
+                <span className="relative">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                  {totalItems > 0 && (
+                    <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-foreground text-background text-[10px] font-medium">
+                      {totalItems > 99 ? "99+" : totalItems}
+                    </span>
+                  )}
+                </span>
+                Cart {totalItems > 0 && `(${totalItems})`}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
     </nav>
   );

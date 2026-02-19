@@ -3,9 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { products, productVariants, wishlists } from "@/db/schema";
 import { ShopClient } from "@/components/ShopClient";
+import { getValidCategorySlugs, getCategories } from "@/actions/categories";
 import { Suspense } from "react";
-
-const VALID_CAT_SLUGS = ["trousers", "shirts", "tshirts", "hoodies", "jackets", "jeans"] as const;
 
 interface ShopPageProps {
   searchParams: Promise<{ category?: string; cat?: string; sort?: string }>;
@@ -13,15 +12,13 @@ interface ShopPageProps {
 
 export default async function ShopPage({ searchParams }: ShopPageProps) {
   const params = await searchParams;
-  const category = params.category;
   const cat = params.cat;
 
-  const catFilter =
-    cat &&
-    VALID_CAT_SLUGS.includes(cat as (typeof VALID_CAT_SLUGS)[number]);
+  const validSlugs = await getValidCategorySlugs();
+  const catFilter = cat && validSlugs.includes(cat);
 
   const whereClause = catFilter
-    ? and(eq(products.isVisible, true), eq(products.categorySlug, cat as (typeof VALID_CAT_SLUGS)[number]))
+    ? and(eq(products.isVisible, true), eq(products.categorySlug, cat))
     : eq(products.isVisible, true);
 
   const productList = await db
@@ -47,6 +44,9 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
     {}
   );
 
+  const categories = await getCategories();
+  const categoryLabel = catFilter && cat ? categories.find((c) => c.slug === cat)?.label ?? null : null;
+
   let wishlistProductIds: number[] = [];
   const { userId } = await auth();
   if (userId) {
@@ -70,6 +70,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
           products={productList}
           variantsByProductId={variantsByProductId}
           wishlistProductIds={wishlistProductIds}
+          categoryLabel={categoryLabel}
         />
       </Suspense>
     </div>

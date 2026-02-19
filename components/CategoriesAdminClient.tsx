@@ -1,0 +1,241 @@
+"use client";
+
+import { useState, useCallback, useEffect } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useDropzone } from "react-dropzone";
+import {
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  type ProductCategory,
+} from "@/actions/categories";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+
+interface CategoriesAdminClientProps {
+  categories: ProductCategory[];
+}
+
+export function CategoriesAdminClient({ categories: initialCategories }: CategoriesAdminClientProps) {
+  const router = useRouter();
+  const [categories, setCategories] = useState(initialCategories);
+  useEffect(() => {
+    setCategories(initialCategories);
+  }, [initialCategories]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [formSlug, setFormSlug] = useState("");
+  const [formLabel, setFormLabel] = useState("");
+  const [formShowOnHome, setFormShowOnHome] = useState(false);
+  const [formImage, setFormImage] = useState<File | null>(null);
+
+  const resetForm = useCallback(() => {
+    setFormSlug("");
+    setFormLabel("");
+    setFormShowOnHome(false);
+    setFormImage(null);
+    setEditingId(null);
+    setAdding(false);
+    setError(null);
+  }, []);
+
+  const startAdd = () => {
+    resetForm();
+    setAdding(true);
+  };
+
+  const startEdit = (cat: ProductCategory) => {
+    resetForm();
+    setFormSlug(cat.slug);
+    setFormLabel(cat.label);
+    setFormShowOnHome(cat.showOnHome);
+    setEditingId(cat.id);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const formData = new FormData();
+    formData.set("slug", formSlug);
+    formData.set("label", formLabel);
+    formData.set("showOnHome", String(formShowOnHome));
+    if (formImage) formData.set("image", formImage);
+
+    if (editingId) {
+      const result = await updateCategory(editingId, formData);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+    } else {
+      const result = await createCategory(formData);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+    }
+    resetForm();
+    router.refresh();
+  };
+
+  const handleDelete = async (id: number) => {
+    setDeletingId(id);
+    const result = await deleteCategory(id);
+    setDeletingId(null);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setCategories((prev) => prev.filter((c) => c.id !== id));
+    router.refresh();
+  };
+
+  const { getRootProps, getInputProps } = useDropzone({
+    onDrop: (files) => files[0] && setFormImage(files[0]),
+    accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp", ".gif"] },
+    maxSize: 5 * 1024 * 1024,
+    maxFiles: 1,
+    disabled: !adding && editingId === null,
+  });
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Product Categories</h1>
+        <Button onClick={startAdd} disabled={adding || editingId !== null}>
+          Add Category
+        </Button>
+      </div>
+
+      <p className="text-sm text-muted-foreground">
+        Categories shown on the home page are limited to 6. Use &quot;Show on home&quot; to control which appear there.
+        All categories appear in the burger menu.
+      </p>
+
+      {(adding || editingId !== null) && (
+        <form onSubmit={handleSubmit} className="border border-border rounded-lg p-6 space-y-4 max-w-md">
+          <h2 className="text-lg font-semibold">{editingId ? "Edit Category" : "New Category"}</h2>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <div className="space-y-2">
+            <Label htmlFor="slug">Slug (URL-friendly, e.g. trousers)</Label>
+            <Input
+              id="slug"
+              value={formSlug}
+              onChange={(e) => setFormSlug(e.target.value)}
+              placeholder="trousers"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="label">Label (display name)</Label>
+            <Input
+              id="label"
+              value={formLabel}
+              onChange={(e) => setFormLabel(e.target.value)}
+              placeholder="Trousers"
+              required
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="showOnHome"
+              checked={formShowOnHome}
+              onCheckedChange={(c) => setFormShowOnHome(!!c)}
+            />
+            <Label htmlFor="showOnHome" className="cursor-pointer">
+              Show on home page (max 6)
+            </Label>
+          </div>
+          <div className="space-y-2">
+            <Label>Image</Label>
+            <div {...getRootProps()} className="border-2 border-dashed border-border rounded p-4 cursor-pointer hover:bg-muted/50">
+              <input {...getInputProps()} />
+              {formImage ? (
+                <p className="text-sm">{formImage.name}</p>
+              ) : editingId ? (
+                <p className="text-sm text-muted-foreground">Drop new image or click to replace (optional)</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Drop image or click to select</p>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit">{editingId ? "Save" : "Add"}</Button>
+            <Button type="button" variant="outline" onClick={resetForm}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+
+      <div className="border border-border rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted">
+            <tr>
+              <th className="text-left p-4 font-medium">Image</th>
+              <th className="text-left p-4 font-medium">Slug</th>
+              <th className="text-left p-4 font-medium">Label</th>
+              <th className="text-left p-4 font-medium">Home</th>
+              <th className="text-right p-4 font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.map((cat) => (
+              <tr key={cat.id} className="border-t border-border">
+                <td className="p-4">
+                  <div className="w-12 h-16 relative bg-muted overflow-hidden">
+                    {cat.image ? (
+                      <Image
+                        src={cat.image}
+                        alt={cat.label}
+                        fill
+                        className="object-cover"
+                        unoptimized={cat.image.startsWith("http")}
+                        sizes="48px"
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground flex items-center justify-center h-full">—</span>
+                    )}
+                  </div>
+                </td>
+                <td className="p-4 font-mono text-muted-foreground">{cat.slug}</td>
+                <td className="p-4">{cat.label}</td>
+                <td className="p-4">{cat.showOnHome ? "Yes" : "No"}</td>
+                <td className="p-4 text-right">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => startEdit(cat)}
+                    disabled={adding || editingId !== null}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="ml-2"
+                    onClick={() => handleDelete(cat.id)}
+                    disabled={deletingId === cat.id}
+                  >
+                    {deletingId === cat.id ? "Deleting…" : "Delete"}
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {categories.length === 0 && (
+          <div className="p-12 text-center text-muted-foreground">
+            No categories yet. Add one to get started.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

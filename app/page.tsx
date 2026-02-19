@@ -5,7 +5,8 @@ import { db } from "@/db";
 import { products } from "@/db/schema";
 import { getHeroImages } from "@/actions/hero";
 import { getHomeVideo } from "@/actions/video";
-import { getLookbookItems } from "@/actions/lookbook";
+import { getLookbookItems, getLookbookSectionVisible } from "@/actions/lookbook";
+import { getCategoriesForHome } from "@/actions/categories";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { VideoMuteToggle } from "@/components/VideoMuteToggle";
 import { NewsletterForm } from "@/components/NewsletterForm";
@@ -13,21 +14,9 @@ import { NewsletterForm } from "@/components/NewsletterForm";
 const PEXELS = (id: number, w = 800, h = 1000) =>
   `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${w}&h=${h}&fit=crop`;
 
-const CATEGORIES = [
-  { label: "Trousers", image: "/images/trousers.png", href: "/shop?category=CLOTHING&cat=trousers" },
-  { label: "Shirts", image: "/images/shirts.png", href: "/shop?category=CLOTHING&cat=shirts" },
-  { label: "T-Shirts", image: "/images/tshirts.png", href: "/shop?category=CLOTHING&cat=tshirts" },
-  { label: "Hoodies", image: "/images/hoodies.png", href: "/shop?category=CLOTHING&cat=hoodies" },
-  {
-    label: "Jackets & Coats",
-    image: "/images/A9C0AFA5-B129-4D89-8EE6-EC5C28086A2E.JPG",
-    href: "/shop?category=CLOTHING&cat=jackets",
-  },
-  { label: "Jeans", image: "/images/jeans.png", href: "/shop?category=CLOTHING&cat=jeans" },
-];
-
 export default async function HomePage() {
-  const [discoverProducts, heroImages, homeVideo, lookbookItems] = await Promise.all([
+  const [discoverProducts, heroImages, homeVideo, lookbookItems, lookbookSectionVisible, homeCategories] =
+    await Promise.all([
     db
       .select()
       .from(products)
@@ -37,6 +26,8 @@ export default async function HomePage() {
     getHeroImages(),
     getHomeVideo(),
     getLookbookItems(),
+    getLookbookSectionVisible(),
+    getCategoriesForHome(),
   ]);
 
   return (
@@ -71,23 +62,24 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Category Grid */}
+      {/* Category Grid - only categories with show_on_home, max 6 */}
       <section className="py-24 px-6">
         <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {CATEGORIES.map(({ label, image, href }) => (
+          {homeCategories.map((cat) => (
             <Link
-              key={label}
-              href={href}
+              key={cat.id}
+              href={`/shop?category=CLOTHING&cat=${cat.slug}`}
               className="group relative block aspect-[3/4] overflow-hidden"
             >
               <Image
-                src={image}
-                alt={label}
+                src={cat.image ?? "/images/trousers.png"}
+                alt={cat.label}
                 fill
                 className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
+                unoptimized={cat.image?.startsWith("http")}
               />
               <p className="absolute bottom-4 left-4 text-sm font-normal text-foreground group-hover:opacity-100 opacity-90 transition-opacity">
-                {label}
+                {cat.label}
               </p>
             </Link>
           ))}
@@ -109,6 +101,7 @@ export default async function HomePage() {
       </section>
 
       {/* Lookbook */}
+      {lookbookSectionVisible && (
       <section className="py-24 px-6">
         <h2 className="text-sm font-medium text-foreground tracking-[0.2em] uppercase mb-12 text-center">
           Get the Look
@@ -130,6 +123,7 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+      )}
 
       {/* Product Discovery */}
       <section className="py-24 px-6 bg-background">
@@ -141,6 +135,13 @@ export default async function HomePage() {
             discoverProducts.map((product) => {
               const imageUrl = product.images?.[0] ?? PEXELS(708440, 440, 660);
               const price = typeof product.price === "string" ? product.price : String(product.price);
+              const salePrice = product.salePrice
+                ? (typeof product.salePrice === "string" ? product.salePrice : String(product.salePrice))
+                : null;
+              const percentOff =
+                salePrice && parseFloat(price) > 0
+                  ? Math.round((1 - parseFloat(salePrice) / parseFloat(price)) * 100)
+                  : 0;
               return (
                 <Link
                   key={product.id}
@@ -148,6 +149,11 @@ export default async function HomePage() {
                   className="flex-shrink-0 w-[220px] group"
                 >
                   <div className="aspect-[2/3] overflow-hidden mb-4 relative">
+                    {percentOff > 0 && (
+                      <span className="absolute top-2 left-2 z-10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider bg-destructive text-destructive-foreground">
+                        -{percentOff}%
+                      </span>
+                    )}
                     <Image
                       src={imageUrl}
                       alt={product.name}
@@ -157,7 +163,16 @@ export default async function HomePage() {
                     />
                   </div>
                   <p className="text-sm font-normal text-foreground">{product.name}</p>
-                  <p className="text-sm font-light text-muted-foreground mt-1">${price}</p>
+                  <p className="text-sm font-light text-muted-foreground mt-1">
+                    {salePrice ? (
+                      <>
+                        <span className="line-through">${price}</span>{" "}
+                        <span className="text-destructive font-medium">${salePrice}</span>
+                      </>
+                    ) : (
+                      `$${price}`
+                    )}
+                  </p>
                 </Link>
               );
             })

@@ -4,15 +4,7 @@ import { db } from "@/db";
 import { products, productVariants } from "@/db/schema";
 import { inArray, desc } from "drizzle-orm";
 import { ProductsTable } from "./ProductsTable";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  trousers: "Trousers",
-  shirts: "Shirts",
-  tshirts: "T-Shirts",
-  hoodies: "Hoodies",
-  jackets: "Jackets & Coats",
-  jeans: "Jeans",
-};
+import { getCategories } from "@/actions/categories";
 
 export default async function AdminProductsPage({
   searchParams,
@@ -22,6 +14,9 @@ export default async function AdminProductsPage({
   const params = await searchParams;
   const q = params.q?.trim();
   const category = params.category;
+
+  const categories = await getCategories();
+  const categoryLabels = Object.fromEntries(categories.map((c) => [c.slug, c.label]));
 
   let productList = await db
     .select()
@@ -66,7 +61,7 @@ export default async function AdminProductsPage({
     ...p,
     totalStock: stockByProduct[p.id] ?? 0,
     stockBySize: stockBySizeByProduct[p.id] ?? {},
-    categoryLabel: CATEGORY_LABELS[p.categorySlug ?? ""] ?? p.categorySlug ?? p.category ?? "—",
+    categoryLabel: categoryLabels[p.categorySlug ?? ""] ?? p.categorySlug ?? p.category ?? "—",
     colorLabel: (p as { color?: string | null }).color ?? deriveColor(p.name, p.description),
   }));
 
@@ -87,6 +82,7 @@ export default async function AdminProductsPage({
           products={productsWithStock}
           initialQuery={q}
           initialCategory={category}
+          categories={categories}
         />
       </Suspense>
     </div>

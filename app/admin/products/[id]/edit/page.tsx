@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { products, productVariants } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { EditProductForm } from "@/components/EditProductForm";
+import { getCategories } from "@/actions/categories";
 
 export default async function EditProductPage({
   params,
@@ -27,6 +28,8 @@ export default async function EditProductPage({
     .from(productVariants)
     .where(eq(productVariants.productId, productId));
 
+  const categories = await getCategories();
+
   return (
     <div>
       <Link
@@ -36,7 +39,7 @@ export default async function EditProductPage({
         ← Back to products
       </Link>
       <h1 className="text-2xl font-bold mb-8">Edit Product</h1>
-      <EditProductForm product={product} variants={variants} />
+      <EditProductForm product={product} variants={variants} categories={categories} />
     </div>
   );
 }

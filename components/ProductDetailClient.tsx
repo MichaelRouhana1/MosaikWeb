@@ -39,7 +39,7 @@ export function ProductDetailClient({
     setWishlistState(initialInWishlist);
   }, [initialInWishlist]);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
-  const [mainImageIndex, setMainImageIndex] = useState(0);
+  const [displayOrder, setDisplayOrder] = useState<number[]>([]);
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -48,8 +48,16 @@ export function ProductDetailClient({
   const dragRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
 
   const imageUrls = product.images ?? [];
+
+  useEffect(() => {
+    setDisplayOrder(imageUrls.map((_, i) => i));
+  }, [product.id, imageUrls.length]);
   const hasMultipleImages = imageUrls.length >= 2;
   const price = typeof product.price === "string" ? product.price : String(product.price);
+  const salePrice = product.salePrice
+    ? (typeof product.salePrice === "string" ? product.salePrice : String(product.salePrice))
+    : null;
+  const displayPrice = salePrice ?? price;
 
   const variantMap = new Map(variants.map((v) => [v.size, v]));
   const sizes =
@@ -68,12 +76,29 @@ export function ProductDetailClient({
     setImageErrors((prev) => ({ ...prev, [index]: true }));
   };
 
+  const mainImageIndex = displayOrder[0] ?? 0;
+
   const goToPrevImage = () => {
-    setMainImageIndex((i) => (i - 1 + imageUrls.length) % imageUrls.length);
+    setDisplayOrder((order) => {
+      if (order.length <= 1) return order;
+      return [...order.slice(1), order[0]];
+    });
   };
 
   const goToNextImage = () => {
-    setMainImageIndex((i) => (i + 1) % imageUrls.length);
+    setDisplayOrder((order) => {
+      if (order.length <= 1) return order;
+      return [order[order.length - 1], ...order.slice(0, -1)];
+    });
+  };
+
+  const handleThumbnailClick = (position: number) => {
+    setDisplayOrder((order) => {
+      if (position <= 0 || position >= order.length) return order;
+      const next = [...order];
+      [next[0], next[position]] = [next[position], next[0]];
+      return next;
+    });
   };
 
   const openLightbox = () => {
@@ -83,7 +108,13 @@ export function ProductDetailClient({
   };
 
   const closeLightbox = useCallback(() => {
-    setMainImageIndex(lightboxIndex);
+    setDisplayOrder((order) => {
+      const idx = order.indexOf(lightboxIndex);
+      if (idx <= 0) return order;
+      const next = [...order];
+      [next[0], next[idx]] = [next[idx], next[0]];
+      return next;
+    });
     setLightboxOpen(false);
     setLightboxZoomed(false);
   }, [lightboxIndex]);
@@ -154,7 +185,7 @@ export function ProductDetailClient({
       productId: product.id,
       size: selectedSize,
       quantity: 1,
-      priceAtPurchase: price,
+      priceAtPurchase: displayPrice,
       productName: product.name,
       productImage: product.images?.[0],
       productColor: product.color ?? undefined,
@@ -418,22 +449,19 @@ export function ProductDetailClient({
             </div>
           )}
 
-          {/* Thumbnail grid */}
-          {hasMultipleImages && (
+          {/* Thumbnail grid - swaps with main on click */}
+          {hasMultipleImages && displayOrder.length > 1 && (
             <div className="grid grid-cols-2 gap-4">
-              {imageUrls.slice(1).map((url, i) => {
-                const idx = i + 1;
-                const hasError = imageErrors[idx];
+              {displayOrder.slice(1).map((urlIndex, i) => {
+                const position = i + 1;
+                const hasError = imageErrors[urlIndex];
+                const url = imageUrls[urlIndex];
                 return (
                   <button
-                    key={idx}
+                    key={urlIndex}
                     type="button"
-                    onClick={() => setMainImageIndex(idx)}
-                    className={`relative aspect-[2/3] overflow-hidden bg-muted border-2 transition-colors ${
-                      mainImageIndex === idx
-                        ? "border-foreground"
-                        : "border-transparent"
-                    }`}
+                    onClick={() => handleThumbnailClick(position)}
+                    className="relative aspect-[2/3] overflow-hidden bg-muted border-2 border-transparent transition-colors hover:border-muted-foreground/30"
                   >
                     {!hasError && url ? (
                       <Image
@@ -441,7 +469,7 @@ export function ProductDetailClient({
                         alt=""
                         fill
                         className="object-cover"
-                        onError={() => handleImageError(idx)}
+                        onError={() => handleImageError(urlIndex)}
                         unoptimized={!url.startsWith(PEXELS_PREFIX)}
                         sizes="200px"
                       />
@@ -492,7 +520,16 @@ export function ProductDetailClient({
             </div>
           )}
 
-          <p className="mt-6 text-lg font-normal text-foreground">${price}</p>
+          <p className="mt-6 text-lg font-normal text-foreground">
+            {salePrice ? (
+              <>
+                <span className="line-through text-muted-foreground">${price}</span>{" "}
+                <span className="text-destructive font-medium">${salePrice}</span>
+              </>
+            ) : (
+              `$${price}`
+            )}
+          </p>
 
           <div className="mt-8">
             <p className="text-xs font-medium uppercase tracking-widest text-foreground mb-3">Size</p>

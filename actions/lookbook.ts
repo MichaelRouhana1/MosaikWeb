@@ -4,8 +4,44 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { asc, eq, max } from "drizzle-orm";
 import { db } from "@/db";
-import { lookbookItems } from "@/db/schema";
+import { lookbookItems, sectionSettings } from "@/db/schema";
 import { uploadLookImage } from "@/lib/uploadImages";
+
+const LOOKBOOK_SECTION_KEY = "lookbook";
+
+/** Returns whether the Get the Look section is visible on the home page. Defaults to true. */
+export async function getLookbookSectionVisible(): Promise<boolean> {
+  const [row] = await db
+    .select()
+    .from(sectionSettings)
+    .where(eq(sectionSettings.sectionKey, LOOKBOOK_SECTION_KEY))
+    .limit(1);
+  return row?.isVisible ?? true;
+}
+
+/** Sets whether the Get the Look section is visible. Admin only. */
+export async function setLookbookSectionVisible(visible: boolean) {
+  const { sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
+
+  const [existing] = await db
+    .select()
+    .from(sectionSettings)
+    .where(eq(sectionSettings.sectionKey, LOOKBOOK_SECTION_KEY))
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(sectionSettings)
+      .set({ isVisible: visible })
+      .where(eq(sectionSettings.id, existing.id));
+  } else {
+    await db.insert(sectionSettings).values({
+      sectionKey: LOOKBOOK_SECTION_KEY,
+      isVisible: visible,
+    });
+  }
+}
 
 export async function getLookbookItems() {
   return db

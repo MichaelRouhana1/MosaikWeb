@@ -18,24 +18,18 @@ import {
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { cn } from "@/lib/utils";
 import type { Product, ProductVariant } from "@/db/schema";
-
-const CATEGORIES = [
-  { value: "trousers", label: "Trousers" },
-  { value: "shirts", label: "Shirts" },
-  { value: "tshirts", label: "T-Shirts" },
-  { value: "hoodies", label: "Hoodies" },
-  { value: "jackets", label: "Jackets & Coats" },
-  { value: "jeans", label: "Jeans" },
-] as const;
+import type { ProductCategory } from "@/actions/categories";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
 export function EditProductForm({
   product,
   variants = [],
+  categories,
 }: {
   product: Product;
   variants?: ProductVariant[];
+  categories: ProductCategory[];
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -166,8 +160,8 @@ export function EditProductForm({
                 defaultValue={product.categorySlug ?? "trousers"}
                 className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.slug}>
                     {cat.label}
                   </option>
                 ))}

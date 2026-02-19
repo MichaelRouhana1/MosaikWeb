@@ -10,19 +10,20 @@ import type { Product } from "@/db/schema";
 import type { ProductVariant } from "@/db/schema";
 
 const PRODUCTS_PER_PAGE = 12;
-const VALID_CAT_SLUGS = ["trousers", "shirts", "tshirts", "hoodies", "jackets", "jeans"] as const;
 const VALID_LEGACY_CATEGORIES = ["CLOTHING", "SHOES", "ACCESSORIES", "BAGS", "OTHER"] as const;
 
 interface ShopClientProps {
   products: Product[];
   variantsByProductId: Record<number, ProductVariant[]>;
   wishlistProductIds: number[];
+  categoryLabel?: string | null;
 }
 
 export function ShopClient({
   products,
   variantsByProductId,
   wishlistProductIds,
+  categoryLabel,
 }: ShopClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -144,7 +145,7 @@ export function ShopClient({
   return (
     <div className="w-full min-h-screen bg-background">
       {/* Category title section - scrolls away with page */}
-      <CategoryHeader category={validCategory} categorySlug={categorySlug} />
+      <CategoryHeader category={validCategory} categorySlug={categorySlug} categoryLabel={categoryLabel} />
 
       {/* Filter and sort bar - sticky, stays visible when scrolling */}
       <div className="sticky top-14 z-30 bg-background border-b border-border">

@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { label: "Hero", href: "/admin/hero" },
   { label: "Video", href: "/admin/video" },
   { label: "Get the Look", href: "/admin/look" },
+  { label: "Categories", href: "/admin/categories" },
   { label: "Products", href: "/admin/products" },
   { label: "Orders", href: "/admin/orders" },
   { label: "Customers", href: "/admin/customers" },

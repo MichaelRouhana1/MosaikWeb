@@ -1,0 +1,12 @@
+diff --git a/node_modules/drizzle-kit/bin.cjs b/node_modules/drizzle-kit/bin.cjs
+index 327fdfd..ca093f7 100644
+--- a/node_modules/drizzle-kit/bin.cjs
++++ b/node_modules/drizzle-kit/bin.cjs
+@@ -19575,6 +19575,7 @@ WHERE
+             for (const checks of tableChecks) {
+               let checkValue = checks.constraint_definition;
+               const constraintName = checks.constraint_name;
++              if (checkValue == null) continue;
+               checkValue = checkValue.replace(/^CHECK\s*\(\(/, "").replace(/\)\)\s*$/, "");
+               checkConstraints[constraintName] = {
+                 name: constraintName,

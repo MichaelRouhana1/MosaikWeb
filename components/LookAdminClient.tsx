@@ -5,9 +5,10 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
 import Cropper, { type Area } from "react-easy-crop";
-import { addLookbookItemFromFile, deleteLookbookItem } from "@/actions/lookbook";
+import { addLookbookItemFromFile, deleteLookbookItem, setLookbookSectionVisible } from "@/actions/lookbook";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { LookbookItem } from "@/db/schema";
 
 /** Matches Get the Look display: aspect 3/4 */
@@ -51,9 +52,10 @@ async function getCroppedBlob(imageSrc: string, pixelCrop: Area): Promise<Blob> 
 
 interface LookAdminClientProps {
   items: LookbookItem[];
+  sectionVisible: boolean;
 }
 
-export function LookAdminClient({ items: initialItems }: LookAdminClientProps) {
+export function LookAdminClient({ items: initialItems, sectionVisible: initialSectionVisible }: LookAdminClientProps) {
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
   const [cropFile, setCropFile] = useState<{
@@ -67,10 +69,24 @@ export function LookAdminClient({ items: initialItems }: LookAdminClientProps) {
 
   const cropFileRef = useRef<typeof cropFile>(null);
   cropFileRef.current = cropFile;
+  const [sectionVisible, setSectionVisible] = useState(initialSectionVisible);
 
   useEffect(() => {
     setItems(initialItems);
   }, [initialItems]);
+
+  useEffect(() => {
+    setSectionVisible(initialSectionVisible);
+  }, [initialSectionVisible]);
+
+  const handleSectionVisibilityChange = useCallback(
+    async (checked: boolean) => {
+      setSectionVisible(checked);
+      await setLookbookSectionVisible(checked);
+      router.refresh();
+    },
+    [router]
+  );
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length >= 1) {
@@ -144,15 +160,24 @@ export function LookAdminClient({ items: initialItems }: LookAdminClientProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Get the Look</h1>
-        <div {...getRootProps()}>
-          <input {...getInputProps()} />
-          <Button
-            type="button"
-            disabled={!!cropFile || isAdding}
-            className="cursor-pointer"
-          >
-            {isAdding ? "Adding…" : "Add Look"}
-          </Button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+            <Checkbox
+              checked={sectionVisible}
+              onCheckedChange={(checked) => handleSectionVisibilityChange(!!checked)}
+            />
+            Show section on home page
+          </label>
+          <div {...getRootProps()}>
+            <input {...getInputProps()} />
+            <Button
+              type="button"
+              disabled={!!cropFile || isAdding}
+              className="cursor-pointer"
+            >
+              {isAdding ? "Adding…" : "Add Look"}
+            </Button>
+          </div>
         </div>
       </div>
 

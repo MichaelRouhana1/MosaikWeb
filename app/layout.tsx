@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { CartProvider } from "@/context/CartContext";
 import { Navbar } from "@/components/Navbar";
@@ -36,6 +37,7 @@ export default function RootLayout({
             <CartProvider>
               <Navbar />
               {children}
+              <Toaster richColors position="top-right" />
             </CartProvider>
           </ThemeProvider>
         </body>

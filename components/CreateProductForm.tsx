@@ -16,19 +16,11 @@ import {
 } from "@/components/ui/card";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { cn } from "@/lib/utils";
-
-const CATEGORIES = [
-  { value: "trousers", label: "Trousers" },
-  { value: "shirts", label: "Shirts" },
-  { value: "tshirts", label: "T-Shirts" },
-  { value: "hoodies", label: "Hoodies" },
-  { value: "jackets", label: "Jackets & Coats" },
-  { value: "jeans", label: "Jeans" },
-] as const;
+import type { ProductCategory } from "@/actions/categories";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
-export function CreateProductForm() {
+export function CreateProductForm({ categories }: { categories: ProductCategory[] }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -148,8 +140,8 @@ export function CreateProductForm() {
                 className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Select category</option>
-                {CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.slug}>
                     {cat.label}
                   </option>
                 ))}

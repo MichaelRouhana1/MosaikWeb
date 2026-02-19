@@ -27,12 +27,24 @@ export const orderStatusEnum = pgEnum("order_status", [
   "CANCELLED",
 ]);
 
-// Products - category_slug matches landing page: trousers, shirts, tshirts, hoodies, jackets, jeans
+// Product categories - admin-managed, slug used for shop filtering
+export const productCategories = pgTable("product_categories", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  label: text("label").notNull(),
+  image: text("image"),
+  showOnHome: boolean("show_on_home").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Products - category_slug references product_categories.slug
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  salePrice: decimal("sale_price", { precision: 10, scale: 2 }),
   category: productCategoryEnum("category").notNull(),
   categorySlug: text("category_slug"),
   color: text("color"),
@@ -56,10 +68,10 @@ export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   userId: text("user_id"),
   guestEmail: text("guest_email"),
-  customerName: text("customer_name"),
-  phoneNumber: text("phone_number"),
-  addressLine1: text("address_line1"),
-  city: text("city"),
+  customerName: text("customer_name").notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  addressLine1: text("address_line1").notNull(),
+  city: text("city").notNull(),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   status: orderStatusEnum("status").notNull().default("PENDING"),
   paymentMethod: text("payment_method").notNull().default("COD"),
@@ -112,6 +124,13 @@ export const homeVideo = pgTable("home_video", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Section visibility settings (e.g. show/hide "Get the Look" on home page)
+export const sectionSettings = pgTable("section_settings", {
+  id: serial("id").primaryKey(),
+  sectionKey: text("section_key").notNull().unique(),
+  isVisible: boolean("is_visible").notNull().default(true),
+});
+
 // Get the Look section - admin-managed categories
 export const lookbookItems = pgTable("lookbook_items", {
   id: serial("id").primaryKey(),
@@ -148,6 +167,9 @@ export const wishlistsRelations = relations(wishlists, ({ one }) => ({
 }));
 
 // Exported types
+export type ProductCategory = typeof productCategories.$inferSelect;
+export type NewProductCategory = typeof productCategories.$inferInsert;
+
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 
@@ -162,6 +184,9 @@ export type NewOrderItem = typeof orderItems.$inferInsert;
 
 export type Wishlist = typeof wishlists.$inferSelect;
 export type NewWishlist = typeof wishlists.$inferInsert;
+
+export type SectionSetting = typeof sectionSettings.$inferSelect;
+export type NewSectionSetting = typeof sectionSettings.$inferInsert;
 
 export type LookbookItem = typeof lookbookItems.$inferSelect;
 export type NewLookbookItem = typeof lookbookItems.$inferInsert;

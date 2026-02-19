@@ -36,6 +36,14 @@ export function ProductCard({
   const hasMultipleImages = imageUrls.length > 1;
   const currentImage = imageUrls[currentImageIndex];
   const price = typeof product.price === "string" ? product.price : String(product.price);
+  const salePrice = product.salePrice
+    ? (typeof product.salePrice === "string" ? product.salePrice : String(product.salePrice))
+    : null;
+  const displayPrice = salePrice ?? price;
+  const percentOff =
+    salePrice && parseFloat(price) > 0
+      ? Math.round((1 - parseFloat(salePrice) / parseFloat(price)) * 100)
+      : 0;
 
   const variantMap = new Map(variants.map((v) => [v.size, v]));
   const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
@@ -85,7 +93,7 @@ export function ProductCard({
       productId: product.id,
       size,
       quantity: 1,
-      priceAtPurchase: price,
+      priceAtPurchase: displayPrice,
       productName: product.name,
       productImage: product.images?.[0],
       productColor: product.color ?? undefined,
@@ -105,6 +113,11 @@ export function ProductCard({
             compact ? "" : ""
           }`}
         >
+          {percentOff > 0 && (
+            <span className="absolute top-2 left-2 z-10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider bg-destructive text-destructive-foreground">
+              -{percentOff}%
+            </span>
+          )}
           {currentImage ? (
             <Image
               src={currentImage}
@@ -255,7 +268,14 @@ export function ProductCard({
             {colorLabel}
           </p>
           <p className="text-sm font-light text-foreground mt-0.5">
-            ${price}
+            {salePrice ? (
+              <>
+                <span className="line-through text-muted-foreground">${price}</span>{" "}
+                <span className="text-destructive font-medium">${salePrice}</span>
+              </>
+            ) : (
+              `$${price}`
+            )}
           </p>
         </div>
       </Link>

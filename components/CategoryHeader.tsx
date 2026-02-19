@@ -36,13 +36,14 @@ const SLUG_CONFIG: Record<string, { label: string; subtitle: string }> = {
 interface CategoryHeaderProps {
   category: string | null;
   categorySlug?: string | null;
+  categoryLabel?: string | null;
 }
 
-export function CategoryHeader({ category, categorySlug }: CategoryHeaderProps) {
-  const slugConfig = categorySlug ? SLUG_CONFIG[categorySlug] : null;
+export function CategoryHeader({ category, categorySlug, categoryLabel }: CategoryHeaderProps) {
+  const slugConfig = categorySlug && !categoryLabel ? SLUG_CONFIG[categorySlug] : null;
   const categoryConfig = category ? CATEGORY_CONFIG[category] : null;
   const config = slugConfig ?? categoryConfig;
-  const label = config?.label ?? "Shop";
+  const label = categoryLabel ?? config?.label ?? "Shop";
   const subtitle =
     config?.subtitle ?? "Explore our collection of modern essentials";
 

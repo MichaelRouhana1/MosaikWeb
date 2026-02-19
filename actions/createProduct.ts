@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { products, productVariants } from "@/db/schema";
 import { uploadProductImage } from "@/lib/uploadImages";
-
-const VALID_CATEGORY_SLUGS = ["trousers", "shirts", "tshirts", "hoodies", "jackets", "jeans"] as const;
+import { getValidCategorySlugs } from "@/actions/categories";
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
 export async function createProduct(formData: FormData): Promise<{ error?: string; productId?: number }> {
@@ -24,7 +23,8 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
 
   if (!name?.trim()) return { error: "Name is required" };
   if (!price || isNaN(parseFloat(price))) return { error: "Valid price is required" };
-  if (!VALID_CATEGORY_SLUGS.includes(categorySlug as (typeof VALID_CATEGORY_SLUGS)[number])) {
+  const validSlugs = await getValidCategorySlugs();
+  if (!validSlugs.includes(categorySlug)) {
     return { error: "Invalid category" };
   }
 
@@ -48,7 +48,7 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
       description: description?.trim() || null,
       price: parseFloat(price).toFixed(2),
       category: "CLOTHING",
-      categorySlug: categorySlug as (typeof VALID_CATEGORY_SLUGS)[number],
+      categorySlug,
       color,
       images: imageUrls,
       isVisible,

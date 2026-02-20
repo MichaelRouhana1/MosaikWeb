@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useAuth } from "@clerk/nextjs";
 
-function getCartKey(userId: string | null): string {
+function getCartKey(userId: string | null | undefined): string {
   return `mosaik_cart_${userId ?? "guest"}`;
 }
 

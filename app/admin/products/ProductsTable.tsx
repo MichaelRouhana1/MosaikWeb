@@ -9,7 +9,7 @@ import {
   type ColumnDef,
   type RowSelectionState,
 } from "@tanstack/react-table";
-import { StockHoverCell } from "./StockHoverCell";
+import { StockHoverCell, type StockByColorRow } from "./StockHoverCell";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -45,6 +45,7 @@ interface ProductWithMeta {
   isVisible: boolean;
   totalStock: number;
   stockBySize?: Record<string, number>;
+  stockByColor?: StockByColorRow[];
   categoryLabel: string;
   colorLabel: string;
 }
@@ -205,6 +206,7 @@ export function ProductsTable({
         <StockHoverCell
           totalStock={row.original.totalStock}
           stockBySize={row.original.stockBySize ?? {}}
+          stockByColor={row.original.stockByColor}
         />
       ),
     },

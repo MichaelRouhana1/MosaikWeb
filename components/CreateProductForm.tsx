@@ -20,69 +20,93 @@ import type { ProductCategory } from "@/actions/categories";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
+interface ColorEntry {
+  id: string;
+  name: string;
+  hexCode: string;
+  imageFiles: File[];
+  stockBySize: Record<string, number>;
+}
+
 export function CreateProductForm({ categories }: { categories: ProductCategory[] }) {
   const router = useRouter();
-  const formRef = useRef<HTMLFormElement>(null);
-  const [files, setFiles] = useState<File[]>([]);
-  const [stockBySize, setStockBySize] = useState<Record<string, number>>(
-    Object.fromEntries(SIZES.map((s) => [s, 0]))
-  );
+  const [colors, setColors] = useState<ColorEntry[]>([]);
   const [state, setState] = useState<{ error?: string; productId?: number } | null>(null);
   const [isPending, setIsPending] = useState(false);
-  const [cropFile, setCropFile] = useState<{ file: File; objectUrl: string } | null>(null);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 1) {
-      const file = acceptedFiles[0];
-      const url = URL.createObjectURL(file);
-      setCropFile({ file, objectUrl: url });
-    } else if (acceptedFiles.length > 1) {
-      setFiles((prev) => [...prev, ...acceptedFiles]);
-    }
-  }, []);
+  const addColor = () => {
+    setColors((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        name: "",
+        hexCode: "#000000",
+        imageFiles: [],
+        stockBySize: Object.fromEntries(SIZES.map((s) => [s, 0])),
+      },
+    ]);
+  };
 
-  const cropFileRef = useRef<{ file: File; objectUrl: string } | null>(null);
-  cropFileRef.current = cropFile;
+  const removeColor = (id: string) => {
+    setColors((prev) => prev.filter((c) => c.id !== id));
+  };
 
-  const handleCropComplete = useCallback((blob: Blob) => {
-    const current = cropFileRef.current;
-    if (!current) return;
-    URL.revokeObjectURL(current.objectUrl);
-    const file = new File([blob], current.file.name.replace(/\.[^.]+$/, ".jpg"), {
-      type: "image/jpeg",
-    });
-    setFiles((prev) => [...prev, file]);
-    setCropFile(null);
-  }, []);
+  const updateColor = (id: string, updates: Partial<Omit<ColorEntry, "id">>) => {
+    setColors((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
+    );
+  };
 
-  const handleCropCancel = useCallback(() => {
-    const current = cropFileRef.current;
-    if (current) {
-      URL.revokeObjectURL(current.objectUrl);
-      setCropFile(null);
-    }
-  }, []);
+  const addFilesToColor = (id: string, files: File[]) => {
+    setColors((prev) =>
+      prev.map((c) =>
+        c.id === id ? { ...c, imageFiles: [...c.imageFiles, ...files] } : c
+      )
+    );
+  };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "image/*": [".png", ".jpg", ".jpeg", ".webp", ".gif"],
-    },
-    maxSize: 5 * 1024 * 1024,
-  });
-
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+  const removeFileFromColor = (colorId: string, fileIndex: number) => {
+    setColors((prev) =>
+      prev.map((c) =>
+        c.id === colorId
+          ? { ...c, imageFiles: c.imageFiles.filter((_, i) => i !== fileIndex) }
+          : c
+      )
+    );
   };
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!formRef.current) return;
+    const form = e.currentTarget;
+    if (!form) return;
+
+    if (colors.length === 0) {
+      setState({ error: "Add at least one color" });
+      return;
+    }
+
+    const invalidColors = colors.filter((c) => !c.name.trim());
+    if (invalidColors.length > 0) {
+      setState({ error: "Each color must have a name" });
+      return;
+    }
+
     setIsPending(true);
     setState(null);
-    const formData = new FormData(formRef.current);
-    files.forEach((file) => formData.append("images", file));
-    SIZES.forEach((size) => formData.append(`stock_${size}`, String(stockBySize[size] ?? 0)));
+
+    const formData = new FormData(form);
+    formData.set("color_count", String(colors.length));
+    colors.forEach((color, i) => {
+      formData.set(`color_${i}_name`, color.name.trim());
+      formData.set(`color_${i}_hex`, color.hexCode || "#000000");
+      color.imageFiles.forEach((file) => {
+        formData.append(`color_${i}_images`, file);
+      });
+      SIZES.forEach((size) => {
+        formData.set(`color_${i}_stock_${size}`, String(color.stockBySize[size] ?? 0));
+      });
+    });
+
     const result = await createProduct(formData);
     setState(result);
     setIsPending(false);
@@ -97,7 +121,7 @@ export function CreateProductForm({ categories }: { categories: ProductCategory[
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit}>
       <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle>Product details</CardTitle>
@@ -148,14 +172,6 @@ export function CreateProductForm({ categories }: { categories: ProductCategory[
               </select>
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="color">Color</Label>
-            <Input
-              id="color"
-              name="color"
-              placeholder="e.g. Black, Navy, White"
-            />
-          </div>
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -169,99 +185,263 @@ export function CreateProductForm({ categories }: { categories: ProductCategory[
               Visible in store
             </Label>
           </div>
-          <div className="space-y-2">
-            <Label>Images</Label>
-            <div
-              {...getRootProps()}
-              className={cn(
-                "border-input flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed p-4 transition-colors",
-                isDragActive ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-              )}
-            >
-              <input {...getInputProps()} />
-              <p className="text-center text-sm text-muted-foreground">
-                {isDragActive
-                  ? "Drop images here..."
-                  : "Drag & drop images here, or click to select"}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                PNG, JPG, WebP, GIF up to 5MB
-              </p>
+
+          {/* Color Management Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium">Colors</h3>
+                <p className="text-xs text-muted-foreground">
+                  Add colors with their own images and stock levels
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addColor}>
+                Add color
+              </Button>
             </div>
-            {files.length > 0 && (
-              <ul className="mt-2 space-y-1">
-                {files.map((file, i) => (
-                  <li
-                    key={i}
-                    className="flex items-center justify-between rounded bg-muted px-2 py-1 text-sm"
-                  >
-                    {file.name}
-                    <button
-                      type="button"
-                      onClick={() => removeFile(i)}
-                      className="text-destructive hover:underline"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
+
+            {colors.map((color) => (
+              <ColorRow
+                key={color.id}
+                color={color}
+                sizes={SIZES}
+                onUpdate={(updates) => updateColor(color.id, updates)}
+                onRemove={() => removeColor(color.id)}
+                onAddFiles={(files) => addFilesToColor(color.id, files)}
+                onRemoveFile={(idx) => removeFileFromColor(color.id, idx)}
+                canRemove={colors.length > 1}
+              />
+            ))}
+
+            {colors.length === 0 && (
+              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+                <p className="text-sm text-muted-foreground mb-4">
+                  No colors added yet. Add at least one color to continue.
+                </p>
+                <Button type="button" variant="outline" onClick={addColor}>
+                  Add first color
+                </Button>
+              </div>
             )}
           </div>
-          <div className="space-y-3">
-            <div>
-              <h3 className="text-sm font-medium mb-1">Sizes & inventory</h3>
-              <p className="text-xs text-muted-foreground">
-                Set stock for each size. Use 0 if not stocked.
-              </p>
+
+          {/* Variant Matrix - shown when colors exist */}
+          {colors.length > 0 && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium">Stock by color & size</h3>
+                <p className="text-xs text-muted-foreground">
+                  Set inventory for each color and size combination
+                </p>
+              </div>
+              <div className="border border-border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="text-left p-3 font-medium">Color</th>
+                      {SIZES.map((s) => (
+                        <th key={s} className="p-3 font-medium text-center">
+                          {s}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {colors.map((color) => (
+                      <tr key={color.id} className="border-t border-border">
+                        <td className="p-3 font-medium">{color.name || "—"}</td>
+                        {SIZES.map((size) => (
+                          <td key={size} className="p-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              value={color.stockBySize[size] ?? 0}
+                              onChange={(e) =>
+                                updateColor(color.id, {
+                                  stockBySize: {
+                                    ...color.stockBySize,
+                                    [size]: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                  },
+                                })
+                              }
+                              className="h-8 w-16 text-center"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-4">
-              {SIZES.map((size) => (
-                <div key={size} className="space-y-1.5 min-w-[80px]">
-                  <Label htmlFor={`stock_${size}`} className="text-xs">
-                    {size}
-                  </Label>
-                  <Input
-                    id={`stock_${size}`}
-                    type="number"
-                    min={0}
-                    value={stockBySize[size] ?? 0}
-                    onChange={(e) =>
-                      setStockBySize((prev) => ({
-                        ...prev,
-                        [size]: Math.max(0, parseInt(e.target.value, 10) || 0),
-                      }))
-                    }
-                    className="h-9"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
+
           {state?.error && (
             <p className="text-sm text-destructive">{state.error}</p>
           )}
-          {cropFile && (
-            <ImageCropModal
-              imageSrc={cropFile.objectUrl}
-              onComplete={handleCropComplete}
-              onCancel={handleCropCancel}
-            />
-          )}
           <div className="flex gap-4">
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending || colors.length === 0}>
               {isPending ? "Creating…" : "Create product"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.back()}
-            >
+            <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel
             </Button>
           </div>
         </CardContent>
       </Card>
     </form>
+  );
+}
+
+interface ColorRowProps {
+  color: ColorEntry;
+  sizes: readonly string[];
+  onUpdate: (updates: Partial<Omit<ColorEntry, "id">>) => void;
+  onRemove: () => void;
+  onAddFiles: (files: File[]) => void;
+  onRemoveFile: (index: number) => void;
+  canRemove: boolean;
+}
+
+function ColorRow({
+  color,
+  onUpdate,
+  onRemove,
+  onAddFiles,
+  onRemoveFile,
+  canRemove,
+}: ColorRowProps) {
+  const [cropPending, setCropPending] = useState<{ file: File; objectUrl: string } | null>(null);
+  const cropQueueRef = useRef<File[]>([]);
+
+  const processNextInQueue = useCallback(() => {
+    const next = cropQueueRef.current.shift();
+    if (!next) {
+      setCropPending(null);
+      return;
+    }
+    setCropPending({ file: next, objectUrl: URL.createObjectURL(next) });
+  }, []);
+
+  const handleCropComplete = useCallback(
+    (blob: Blob) => {
+      const current = cropPending;
+      if (!current) return;
+      URL.revokeObjectURL(current.objectUrl);
+      setCropPending(null);
+      const file = new File([blob], current.file.name.replace(/\.[^.]+$/, ".jpg"), {
+        type: "image/jpeg",
+      });
+      onAddFiles([file]);
+      processNextInQueue();
+    },
+    [cropPending, onAddFiles, processNextInQueue]
+  );
+
+  const handleCropCancel = useCallback(() => {
+    if (cropPending) {
+      URL.revokeObjectURL(cropPending.objectUrl);
+      setCropPending(null);
+    }
+    processNextInQueue();
+  }, [cropPending, processNextInQueue]);
+
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      if (acceptedFiles.length === 0) return;
+      cropQueueRef.current.push(...acceptedFiles);
+      if (!cropPending) processNextInQueue();
+    },
+    [cropPending, processNextInQueue]
+  );
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp", ".gif"] },
+    maxSize: 5 * 1024 * 1024,
+  });
+
+  return (
+    <div className="border border-border rounded-lg p-4 space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Color name</Label>
+            <Input
+              placeholder="e.g. Midnight Black"
+              value={color.name}
+              onChange={(e) => onUpdate({ name: e.target.value })}
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Hex code</Label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="color"
+                value={color.hexCode}
+                onChange={(e) => onUpdate({ hexCode: e.target.value })}
+                className="h-10 w-14 cursor-pointer rounded border border-input bg-transparent p-1"
+              />
+              <Input
+                value={color.hexCode}
+                onChange={(e) => onUpdate({ hexCode: e.target.value })}
+                placeholder="#000000"
+                className="font-mono"
+              />
+            </div>
+          </div>
+        </div>
+        {canRemove && (
+          <Button type="button" variant="ghost" size="sm" onClick={onRemove} className="text-destructive hover:text-destructive">
+            Remove
+          </Button>
+        )}
+      </div>
+      <div className="space-y-1.5">
+        <Label>Images (this color only)</Label>
+        <div
+          {...getRootProps()}
+          className={cn(
+            "border-input flex min-h-[100px] cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed p-4 transition-colors",
+            isDragActive ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+          )}
+        >
+          <input {...getInputProps()} />
+          <p className="text-center text-sm text-muted-foreground">
+            {isDragActive ? "Drop images here…" : "Drag & drop or click to add images"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">PNG, JPG, WebP, GIF up to 5MB</p>
+        </div>
+        {color.imageFiles.length > 0 && (
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {color.imageFiles.map((file, i) => (
+              <li
+                key={i}
+                className="flex items-center gap-2 rounded bg-muted px-2 py-1 text-xs"
+              >
+                {file.name}
+                <button
+                  type="button"
+                  onClick={() => onRemoveFile(i)}
+                  className="text-destructive hover:underline"
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {cropPending && (
+        <ImageCropModal
+          imageSrc={cropPending.objectUrl}
+          onComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+          aspect={2 / 3}
+          title="Crop image (2:3 product ratio)"
+        />
+      )}
+    </div>
   );
 }

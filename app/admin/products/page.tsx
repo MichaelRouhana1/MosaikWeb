@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { db } from "@/db";
-import { products, productVariants } from "@/db/schema";
+import { products, productVariants, productColors } from "@/db/schema";
 import { inArray, desc } from "drizzle-orm";
 import { ProductsTable } from "./ProductsTable";
 import { getCategories } from "@/actions/categories";
@@ -36,13 +36,21 @@ export default async function AdminProductsPage({
   }
 
   const productIds = productList.map((p) => p.id);
-  const variants =
+  const [variants, colorsList] =
     productIds.length > 0
-      ? await db
-          .select()
-          .from(productVariants)
-          .where(inArray(productVariants.productId, productIds))
-      : [];
+      ? await Promise.all([
+          db
+            .select()
+            .from(productVariants)
+            .where(inArray(productVariants.productId, productIds)),
+          db
+            .select()
+            .from(productColors)
+            .where(inArray(productColors.productId, productIds)),
+        ])
+      : [[], []];
+
+  const colorById = Object.fromEntries(colorsList.map((c) => [c.id, c]));
 
   const stockByProduct = variants.reduce<Record<number, number>>((acc, v) => {
     acc[v.productId] = (acc[v.productId] ?? 0) + v.stock;
@@ -53,14 +61,37 @@ export default async function AdminProductsPage({
     Record<number, Record<string, number>>
   >((acc, v) => {
     if (!acc[v.productId]) acc[v.productId] = {};
-    acc[v.productId][v.size] = v.stock;
+    acc[v.productId][v.size] = (acc[v.productId][v.size] ?? 0) + v.stock;
     return acc;
   }, {});
 
+  type StockByColorRow = { colorName: string; stockBySize: Record<string, number> };
+  const stockByColorByProduct: Record<number, StockByColorRow[]> = {};
+  for (const v of variants) {
+    const color = colorById[v.colorId];
+    const colorName = color?.name ?? "—";
+    if (!stockByColorByProduct[v.productId]) stockByColorByProduct[v.productId] = [];
+    let row = stockByColorByProduct[v.productId].find((r) => r.colorName === colorName);
+    if (!row) {
+      row = { colorName, stockBySize: {} };
+      stockByColorByProduct[v.productId].push(row);
+    }
+    row.stockBySize[v.size] = (row.stockBySize[v.size] ?? 0) + v.stock;
+  }
+
+  const firstImageByProductId: Record<number, string> = {};
+  for (const c of colorsList) {
+    if (!firstImageByProductId[c.productId] && c.imageUrls?.[0]) {
+      firstImageByProductId[c.productId] = c.imageUrls[0];
+    }
+  }
+
   const productsWithStock = productList.map((p) => ({
     ...p,
+    images: firstImageByProductId[p.id] ? [firstImageByProductId[p.id]] : [],
     totalStock: stockByProduct[p.id] ?? 0,
     stockBySize: stockBySizeByProduct[p.id] ?? {},
+    stockByColor: stockByColorByProduct[p.id] ?? [],
     categoryLabel: categoryLabels[p.categorySlug ?? ""] ?? p.categorySlug ?? p.category ?? "—",
     colorLabel: (p as { color?: string | null }).color ?? deriveColor(p.name, p.description),
   }));

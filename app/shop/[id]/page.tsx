@@ -3,7 +3,7 @@ import Link from "next/link";
 import { eq, and, inArray, ne } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { products, productVariants, wishlists } from "@/db/schema";
+import { products, productVariants, productColors, wishlists } from "@/db/schema";
 import { ProductDetailClient } from "@/components/ProductDetailClient";
 
 export default async function ProductPage({
@@ -23,10 +23,13 @@ export default async function ProductPage({
 
   if (!product || !product.isVisible) notFound();
 
-  const variants = await db
-    .select()
-    .from(productVariants)
-    .where(eq(productVariants.productId, product.id));
+  const [variants, colors] = await Promise.all([
+    db.select().from(productVariants).where(eq(productVariants.productId, product.id)),
+    db.select().from(productColors).where(eq(productColors.productId, product.id)),
+  ]);
+
+  const firstColorImages = colors[0]?.imageUrls ?? [];
+  const productWithImages = { ...product, images: firstColorImages };
 
   const categorySlug = product.categorySlug ?? "trousers";
   const similarProducts = await db
@@ -42,13 +45,24 @@ export default async function ProductPage({
     .limit(10);
 
   const similarProductIds = similarProducts.map((p) => p.id);
-  const similarVariants =
+  const [similarVariants, similarColors] =
     similarProductIds.length > 0
-      ? await db
-          .select()
-          .from(productVariants)
-          .where(inArray(productVariants.productId, similarProductIds))
-      : [];
+      ? await Promise.all([
+          db.select().from(productVariants).where(inArray(productVariants.productId, similarProductIds)),
+          db.select().from(productColors).where(inArray(productColors.productId, similarProductIds)),
+        ])
+      : [[], []];
+
+  const similarFirstImageByProductId: Record<number, string> = {};
+  for (const c of similarColors) {
+    if (!similarFirstImageByProductId[c.productId] && c.imageUrls?.[0]) {
+      similarFirstImageByProductId[c.productId] = c.imageUrls[0];
+    }
+  }
+  const similarProductsWithImages = similarProducts.map((p) => ({
+    ...p,
+    images: similarFirstImageByProductId[p.id] ? [similarFirstImageByProductId[p.id]] : [],
+  }));
 
   const variantsByProductId = similarVariants.reduce<
     Record<number, typeof productVariants.$inferSelect[]>
@@ -79,10 +93,11 @@ export default async function ProductPage({
         ← Back to shop
       </Link>
       <ProductDetailClient
-        product={product}
+        product={productWithImages}
         variants={variants}
+        colors={colors}
         inWishlist={inWishlist}
-        similarProducts={similarProducts}
+        similarProducts={similarProductsWithImages}
         variantsByProductId={variantsByProductId}
         wishlistProductIds={wishlistProductIds}
       />

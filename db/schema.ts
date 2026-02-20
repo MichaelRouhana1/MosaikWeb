@@ -48,19 +48,31 @@ export const products = pgTable("products", {
   category: productCategoryEnum("category").notNull(),
   categorySlug: text("category_slug"),
   color: text("color"),
-  images: text("images").array().notNull().default([]),
   isVisible: boolean("is_visible").notNull().default(true),
 });
 
-// ProductVariants
+// Product colors - each color has its own image gallery
+export const productColors = pgTable("product_colors", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  hexCode: text("hex_code"),
+  imageUrls: text("image_urls").array().notNull().default([]),
+});
+
+// ProductVariants - size + stock per color
 export const productVariants = pgTable("product_variants", {
   id: serial("id").primaryKey(),
   productId: integer("product_id")
     .notNull()
     .references(() => products.id, { onDelete: "cascade" }),
+  colorId: integer("color_id")
+    .notNull()
+    .references(() => productColors.id, { onDelete: "cascade" }),
   size: text("size").notNull(),
   stock: integer("stock").notNull().default(0),
-  sku: text("sku").notNull(),
 });
 
 // Orders
@@ -98,12 +110,19 @@ export const orderItems = pgTable("order_items", {
 // Relations
 export const productsRelations = relations(products, ({ many }) => ({
   variants: many(productVariants),
+  colors: many(productColors),
   orderItems: many(orderItems),
   wishlistItems: many(wishlists),
 }));
 
+export const productColorsRelations = relations(productColors, ({ one, many }) => ({
+  product: one(products),
+  variants: many(productVariants),
+}));
+
 export const productVariantsRelations = relations(productVariants, ({ one }) => ({
   product: one(products),
+  color: one(productColors),
 }));
 
 export const ordersRelations = relations(orders, ({ many }) => ({
@@ -172,6 +191,9 @@ export type NewProductCategory = typeof productCategories.$inferInsert;
 
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
+
+export type ProductColor = typeof productColors.$inferSelect;
+export type NewProductColor = typeof productColors.$inferInsert;
 
 export type ProductVariant = typeof productVariants.$inferSelect;
 export type NewProductVariant = typeof productVariants.$inferInsert;

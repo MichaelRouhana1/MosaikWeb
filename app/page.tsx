@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { products } from "@/db/schema";
+import { products, productColors } from "@/db/schema";
 import { getHeroImages } from "@/actions/hero";
 import { getHomeVideo } from "@/actions/video";
 import { getLookbookItems, getLookbookSectionVisible } from "@/actions/lookbook";
@@ -15,7 +15,7 @@ const PEXELS = (id: number, w = 800, h = 1000) =>
   `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${w}&h=${h}&fit=crop`;
 
 export default async function HomePage() {
-  const [discoverProducts, heroImages, homeVideo, lookbookItems, lookbookSectionVisible, homeCategories] =
+  const [productList, heroImages, homeVideo, lookbookItems, lookbookSectionVisible, homeCategories] =
     await Promise.all([
     db
       .select()
@@ -29,6 +29,25 @@ export default async function HomePage() {
     getLookbookSectionVisible(),
     getCategoriesForHome(),
   ]);
+
+  const productIds = productList.map((p) => p.id);
+  const colorsList =
+    productIds.length > 0
+      ? await db
+          .select()
+          .from(productColors)
+          .where(inArray(productColors.productId, productIds))
+      : [];
+  const firstImageByProductId: Record<number, string> = {};
+  for (const c of colorsList) {
+    if (!firstImageByProductId[c.productId] && c.imageUrls?.[0]) {
+      firstImageByProductId[c.productId] = c.imageUrls[0];
+    }
+  }
+  const discoverProducts = productList.map((p) => ({
+    ...p,
+    images: firstImageByProductId[p.id] ? [firstImageByProductId[p.id]] : [],
+  }));
 
   return (
     <div className="pt-14">

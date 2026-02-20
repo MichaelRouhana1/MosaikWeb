@@ -32,7 +32,7 @@ export function ProductCard({
   const [wishlistState, setWishlistState] = useState(inWishlist);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  const imageUrls = product.images ?? [];
+  const imageUrls = (product as { images?: string[] }).images ?? [];
   const hasMultipleImages = imageUrls.length > 1;
   const currentImage = imageUrls[currentImageIndex];
   const price = typeof product.price === "string" ? product.price : String(product.price);
@@ -95,7 +95,7 @@ export function ProductCard({
       quantity: 1,
       priceAtPurchase: displayPrice,
       productName: product.name,
-      productImage: product.images?.[0],
+      productImage: imageUrls[0],
       productColor: product.color ?? undefined,
     });
     openCart();

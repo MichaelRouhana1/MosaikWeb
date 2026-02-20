@@ -3,20 +3,20 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { useCart } from "@/context/CartContext";
 import { toggleWishlist } from "@/actions/toggleWishlist";
 import { ProductCard } from "@/components/ProductCard";
-import type { Product } from "@/db/schema";
-import type { ProductVariant } from "@/db/schema";
+import type { Product, ProductVariant, ProductColor } from "@/db/schema";
 
 const DEFAULT_SIZES = ["XS", "S", "M", "L", "XL"];
 const PEXELS_PREFIX = "https://images.pexels.com/";
 
 interface ProductDetailClientProps {
-  product: Product;
+  product: Product & { images?: string[] };
   variants: ProductVariant[];
+  colors?: ProductColor[];
   inWishlist: boolean;
   similarProducts: Product[];
   variantsByProductId: Record<number, ProductVariant[]>;
@@ -26,12 +26,14 @@ interface ProductDetailClientProps {
 export function ProductDetailClient({
   product,
   variants,
+  colors = [],
   inWishlist: initialInWishlist,
   similarProducts,
   variantsByProductId,
   wishlistProductIds,
 }: ProductDetailClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isSignedIn } = useAuth();
   const { addToCart, openCart } = useCart();
   const [wishlistState, setWishlistState] = useState(initialInWishlist);
@@ -47,22 +49,52 @@ export function ProductDetailClient({
   const lightboxScrollRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
 
-  const imageUrls = product.images ?? [];
+  const firstColor = colors[0];
+  const colorFromUrl = searchParams.get("color");
+  const initialColor =
+    colorFromUrl && colors.find((c) => c.name.toLowerCase() === colorFromUrl.toLowerCase())
+      ? colors.find((c) => c.name.toLowerCase() === colorFromUrl.toLowerCase())!
+      : firstColor;
+  const [selectedColor, setSelectedColorState] = useState<ProductColor | null>(initialColor ?? null);
+
+  useEffect(() => {
+    const matched = colorFromUrl?.trim()
+      ? colors.find((col) => col.name.toLowerCase() === colorFromUrl.toLowerCase())
+      : undefined;
+    setSelectedColorState(matched ?? firstColor ?? null);
+  }, [colorFromUrl, firstColor, colors]);
+
+  const imageUrls = (selectedColor?.imageUrls ?? product.images) ?? [];
 
   useEffect(() => {
     setDisplayOrder(imageUrls.map((_, i) => i));
-  }, [product.id, imageUrls.length]);
+  }, [product.id, imageUrls.length, selectedColor?.id]);
   const hasMultipleImages = imageUrls.length >= 2;
+
+  const handleColorSelect = useCallback(
+    (color: ProductColor) => {
+      setSelectedColorState(color);
+      setSelectedSize(null);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("color", color.name);
+      router.replace(`?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams]
+  );
   const price = typeof product.price === "string" ? product.price : String(product.price);
   const salePrice = product.salePrice
     ? (typeof product.salePrice === "string" ? product.salePrice : String(product.salePrice))
     : null;
   const displayPrice = salePrice ?? price;
 
-  const variantMap = new Map(variants.map((v) => [v.size, v]));
+  const variantsForColor =
+    selectedColor?.id != null
+      ? variants.filter((v) => v.colorId === selectedColor.id)
+      : variants;
+  const variantMap = new Map(variantsForColor.map((v) => [v.size, v]));
   const sizes =
-    variants.length > 0
-      ? [...new Set(variants.map((v) => v.size))].sort(
+    variantsForColor.length > 0
+      ? [...new Set(variantsForColor.map((v) => v.size))].sort(
           (a, b) => DEFAULT_SIZES.indexOf(a) - DEFAULT_SIZES.indexOf(b)
         )
       : DEFAULT_SIZES;
@@ -181,14 +213,20 @@ export function ProductDetailClient({
 
   const handleAddToBag = () => {
     if (!selectedSize || !isSizeInStock(selectedSize)) return;
+    const productImage = imageUrls[0];
+    const colorName = selectedColor?.name ?? product.color ?? undefined;
     addToCart({
       productId: product.id,
       size: selectedSize,
       quantity: 1,
       priceAtPurchase: displayPrice,
       productName: product.name,
-      productImage: product.images?.[0],
-      productColor: product.color ?? undefined,
+      productImage,
+      productColor: colorName,
+      sku:
+        colors.length > 1 && selectedColor
+          ? `${product.id}-${selectedColor.id}-${selectedSize}`
+          : undefined,
     });
     openCart();
   };
@@ -503,9 +541,36 @@ export function ProductDetailClient({
             </button>
           </div>
 
-          {product.color && (
+          {colors.length > 0 ? (
+            <div className="mt-4">
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
+                Color{colors.length > 1 ? ` — ${selectedColor?.name ?? ""}` : ""}
+              </p>
+              <div className="flex gap-3 flex-wrap">
+                {colors.map((c) => {
+                  const isSelected = selectedColor?.id === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => handleColorSelect(c)}
+                      className={`relative w-10 h-10 rounded-full transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-foreground/50 ${
+                        isSelected
+                          ? "ring-2 ring-foreground ring-offset-2 ring-offset-background scale-110"
+                          : "ring-1 ring-border/50 hover:ring-foreground/30"
+                      }`}
+                      style={{ backgroundColor: c.hexCode ?? "var(--muted)" }}
+                      title={c.name}
+                      aria-label={`Select ${c.name}`}
+                      aria-pressed={isSelected}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ) : product.color ? (
             <p className="mt-2 text-sm text-muted-foreground">{product.color}</p>
-          )}
+          ) : null}
 
           {imageUrls[0] && (
             <div className="mt-4 aspect-square w-16 h-16 overflow-hidden border border-border">
@@ -536,6 +601,7 @@ export function ProductDetailClient({
             <div className="flex flex-wrap gap-2">
               {sizes.map((size) => {
                 const inStock = isSizeInStock(size);
+                const stock = getStockForSize(size);
                 return (
                   <button
                     key={size}
@@ -544,11 +610,12 @@ export function ProductDetailClient({
                     disabled={!inStock}
                     className={`w-12 h-12 rounded-full text-xs font-medium uppercase tracking-widest transition-colors ${
                       !inStock
-                        ? "border border-border text-muted-foreground opacity-60 cursor-not-allowed line-through"
+                        ? "border border-border text-muted-foreground opacity-50 cursor-not-allowed bg-muted/30"
                         : selectedSize === size
                           ? "bg-foreground text-background"
                           : "border border-border text-foreground hover:border-foreground"
                     }`}
+                    title={!inStock ? "Out of stock" : stock > 0 ? `${stock} in stock` : undefined}
                   >
                     {size}
                   </button>

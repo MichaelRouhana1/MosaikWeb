@@ -4,9 +4,10 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { products, productVariants } from "@/db/schema";
+import { products, productVariants, productColors } from "@/db/schema";
 import { uploadProductImage } from "@/lib/uploadImages";
 import { getValidCategorySlugs } from "@/actions/categories";
+
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
 export async function updateProduct(
@@ -18,12 +19,12 @@ export async function updateProduct(
     redirect("/");
   }
 
-  const name = formData.get("name") as string;
-  const description = (formData.get("description") as string) || null;
+  const name = (formData.get("name") as string)?.trim();
+  const description = (formData.get("description") as string)?.trim() || null;
   const price = formData.get("price") as string;
   const categorySlug = formData.get("category") as string;
-  const color = (formData.get("color") as string)?.trim() || null;
   const isVisible = formData.get("isVisible") === "true";
+  const colorCount = parseInt(String(formData.get("color_count") ?? "0"), 10);
 
   if (!name?.trim()) return { error: "Name is required" };
   if (!price || isNaN(parseFloat(price))) return { error: "Valid price is required" };
@@ -31,65 +32,136 @@ export async function updateProduct(
   if (!validSlugs.includes(categorySlug)) {
     return { error: "Invalid category" };
   }
+  if (colorCount < 1) return { error: "Add at least one color" };
 
-  const [existing] = await db
-    .select({ images: products.images })
-    .from(products)
-    .where(eq(products.id, productId))
-    .limit(1);
+  type ColorEntry = {
+    existingId: number | null;
+    name: string;
+    hexCode: string | null;
+    existingUrls: string[];
+    imageFiles: File[];
+    stockBySize: Record<string, number>;
+  };
 
-  let imageUrls: string[] = existing?.images ?? [];
+  const colorEntries: ColorEntry[] = [];
 
-  const files = formData.getAll("images") as File[];
-  if (files.some((f) => f?.size)) {
-    for (const file of files) {
-      if (!file?.size) continue;
-      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  for (let i = 0; i < colorCount; i++) {
+    const rawId = formData.get(`color_${i}_id`) as string;
+    const existingId = /^\d+$/.test(String(rawId)) ? parseInt(rawId, 10) : null;
+    const colorName = (formData.get(`color_${i}_name`) as string)?.trim();
+    const colorHex = (formData.get(`color_${i}_hex`) as string)?.trim() || null;
+    const existingUrlsRaw = formData.get(`color_${i}_existing_urls`) as string;
+    let existingUrls: string[] = [];
+    try {
+      existingUrls = existingUrlsRaw ? JSON.parse(existingUrlsRaw) : [];
+    } catch {
+      existingUrls = [];
+    }
+    const imageFiles = formData.getAll(`color_${i}_images`) as File[];
+    const stockBySize: Record<string, number> = {};
+    for (const size of SIZES) {
+      stockBySize[size] = Math.max(0, parseInt(String(formData.get(`color_${i}_stock_${size}`)), 10) || 0);
+    }
+    if (!colorName) return { error: `Color ${i + 1} must have a name` };
+    colorEntries.push({
+      existingId,
+      name: colorName,
+      hexCode: colorHex,
+      existingUrls: Array.isArray(existingUrls) ? existingUrls : [],
+      imageFiles: imageFiles.filter((f) => f?.size),
+      stockBySize,
+    });
+  }
+
+  // Upload new images for each color
+  const colorImageUrls: string[][] = [];
+  for (let i = 0; i < colorEntries.length; i++) {
+    const urls: string[] = [...colorEntries[i].existingUrls];
+    for (const file of colorEntries[i].imageFiles) {
+      const filename = `product-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`;
       const result = await uploadProductImage(file, filename);
       if (result.error) return { error: result.error };
-      imageUrls = [...imageUrls, result.url];
+      urls.push(result.url);
     }
+    colorImageUrls.push(urls);
   }
 
-  await db
-    .update(products)
-    .set({
-      name: name.trim(),
-      description: description?.trim() || null,
-      price: parseFloat(price).toFixed(2),
-      category: "CLOTHING",
-      categorySlug,
-      color,
-      images: imageUrls,
-      isVisible,
-    })
-    .where(eq(products.id, productId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(products)
+      .set({
+        name: name.trim(),
+        description: description?.trim() || null,
+        price: parseFloat(price).toFixed(2),
+        category: "CLOTHING",
+        categorySlug,
+        color: colorEntries[0]?.name ?? null,
+        isVisible,
+      })
+      .where(eq(products.id, productId));
 
-  const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  const existingVariants = await db
-    .select()
-    .from(productVariants)
-    .where(eq(productVariants.productId, productId));
+    const existingColors = await tx
+      .select()
+      .from(productColors)
+      .where(eq(productColors.productId, productId));
 
-  for (const size of SIZES) {
-    const stock = Math.max(0, parseInt(String(formData.get(`stock_${size}`)), 10) || 0);
-    const existing = existingVariants.find((v) => v.size === size);
-    const sku = `${slug}-${size}-${Date.now()}`;
+    const colorIds: number[] = [];
+    for (let i = 0; i < colorEntries.length; i++) {
+      const entry = colorEntries[i];
+      const imageUrls = colorImageUrls[i] ?? [];
 
-    if (existing) {
-      await db
-        .update(productVariants)
-        .set({ stock })
-        .where(eq(productVariants.id, existing.id));
-    } else {
-      await db.insert(productVariants).values({
-        productId,
-        size,
-        stock,
-        sku,
-      });
+      const existingColor = entry.existingId != null ? existingColors.find((c) => c.id === entry.existingId) : null;
+      if (existingColor) {
+        await tx
+          .update(productColors)
+          .set({
+            name: entry.name,
+            hexCode: entry.hexCode,
+            imageUrls,
+          })
+          .where(eq(productColors.id, existingColor.id));
+        colorIds.push(existingColor.id);
+      } else {
+        const [inserted] = await tx
+          .insert(productColors)
+          .values({
+            productId,
+            name: entry.name,
+            hexCode: entry.hexCode,
+            imageUrls,
+          })
+          .returning({ id: productColors.id });
+        colorIds.push(inserted.id);
+      }
     }
-  }
+
+    // Remove colors that are no longer in the form
+    const keptIds = new Set(colorIds);
+    for (const c of existingColors) {
+      if (!keptIds.has(c.id)) {
+        await tx.delete(productVariants).where(eq(productVariants.colorId, c.id));
+        await tx.delete(productColors).where(eq(productColors.id, c.id));
+      }
+    }
+
+    // Delete all variants for this product and re-insert (avoids duplicates/orphans when colors change)
+    await tx.delete(productVariants).where(eq(productVariants.productId, productId));
+
+    for (let i = 0; i < colorEntries.length; i++) {
+      const colorId = colorIds[i];
+      const stockBySize = colorEntries[i].stockBySize;
+
+      for (const size of SIZES) {
+        const stock = stockBySize[size] ?? 0;
+        await tx.insert(productVariants).values({
+          productId,
+          colorId,
+          size,
+          stock,
+        });
+      }
+    }
+  });
 
   return {};
 }

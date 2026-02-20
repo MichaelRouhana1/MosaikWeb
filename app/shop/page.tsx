@@ -1,7 +1,7 @@
 import { eq, and, inArray } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { products, productVariants, wishlists } from "@/db/schema";
+import { products, productVariants, productColors, wishlists } from "@/db/schema";
 import { ShopClient } from "@/components/ShopClient";
 import { getValidCategorySlugs, getCategories } from "@/actions/categories";
 import { Suspense } from "react";
@@ -27,13 +27,24 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
     .where(whereClause);
 
   const productIds = productList.map((p) => p.id);
-  const variantsList =
+  const [variantsList, colorsList] =
     productIds.length > 0
-      ? await db
-          .select()
-          .from(productVariants)
-          .where(inArray(productVariants.productId, productIds))
-      : [];
+      ? await Promise.all([
+          db.select().from(productVariants).where(inArray(productVariants.productId, productIds)),
+          db.select().from(productColors).where(inArray(productColors.productId, productIds)),
+        ])
+      : [[], []];
+
+  const firstImageByProductId: Record<number, string> = {};
+  for (const c of colorsList) {
+    if (!firstImageByProductId[c.productId] && c.imageUrls?.[0]) {
+      firstImageByProductId[c.productId] = c.imageUrls[0];
+    }
+  }
+  const productsWithImages = productList.map((p) => ({
+    ...p,
+    images: firstImageByProductId[p.id] ? [firstImageByProductId[p.id]] : [],
+  }));
 
   const variantsByProductId = variantsList.reduce<Record<number, typeof productVariants.$inferSelect[]>>(
     (acc, v) => {
@@ -67,7 +78,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
         }
       >
         <ShopClient
-          products={productList}
+          products={productsWithImages}
           variantsByProductId={variantsByProductId}
           wishlistProductIds={wishlistProductIds}
           categoryLabel={categoryLabel}

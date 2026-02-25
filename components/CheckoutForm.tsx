@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { placeOrder, type CartItem } from "@/actions/placeOrder";
+import { validatePromoCode } from "@/actions/promo";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { toast } from "sonner";
+
+const DEFAULT_SHIPPING_FEE = 5;
 
 interface CheckoutFormProps {
   cart: CartItem[];
@@ -30,6 +34,7 @@ function placeOrderAction(
     return Promise.resolve({ error: "Cart is empty" });
   }
   const items = JSON.parse(itemsJson) as CartItem[];
+  const promoCode = (formData.get("promoCode") as string)?.trim() || undefined;
   return placeOrder({
     guestEmail: (formData.get("guestEmail") as string) || null,
     paymentMethod: (formData.get("paymentMethod") as string) || "COD",
@@ -38,6 +43,7 @@ function placeOrderAction(
     addressLine1: formData.get("addressLine1") as string,
     city: formData.get("city") as string,
     items,
+    promoCode,
   })
     .then(({ orderId }) => ({ orderId }))
     .catch((err) => ({ error: err instanceof Error ? err.message : "Order failed" }));
@@ -47,6 +53,12 @@ export function CheckoutForm({ cart }: CheckoutFormProps) {
   const router = useRouter();
   const { clearOrderedItems } = useCart();
   const [state, formAction, isPending] = useActionState(placeOrderAction, null);
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<{
+    code: string;
+    discountAmount: number;
+  } | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
 
   useEffect(() => {
     if (state?.orderId) {
@@ -65,14 +77,42 @@ export function CheckoutForm({ cart }: CheckoutFormProps) {
     return null;
   }
 
-  const total = cart.reduce(
+  const subtotal = cart.reduce(
     (sum, item) => sum + item.quantity * parseFloat(item.priceAtPurchase),
     0
   );
+  const discountAmount = appliedPromo?.discountAmount ?? 0;
+  const shippingFee = DEFAULT_SHIPPING_FEE;
+  const total = Math.max(0, subtotal - discountAmount + shippingFee);
+
+  const handleApplyPromo = async () => {
+    const code = promoInput?.trim().toUpperCase();
+    if (!code) {
+      toast.error("Please enter a promo code");
+      return;
+    }
+    setPromoLoading(true);
+    try {
+      const result = await validatePromoCode(code, subtotal, shippingFee);
+      setAppliedPromo({ code: result.code, discountAmount: result.discountAmount });
+      setPromoInput("");
+      toast.success(`Promo code ${result.code} applied! -$${result.discountAmount.toFixed(2)}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Invalid promo code");
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoInput("");
+  };
 
   return (
     <form action={formAction} className="space-y-8">
       <input type="hidden" name="items" value={JSON.stringify(cart)} />
+      <input type="hidden" name="promoCode" value={appliedPromo?.code ?? ""} />
       <div className="grid gap-8 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -149,7 +189,7 @@ export function CheckoutForm({ cart }: CheckoutFormProps) {
             <CardTitle>Order summary</CardTitle>
             <CardDescription>{cart.length} item(s) in your cart</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <ul className="space-y-3">
               {cart.map((item, i) => (
                 <li
@@ -168,9 +208,62 @@ export function CheckoutForm({ cart }: CheckoutFormProps) {
                 </li>
               ))}
             </ul>
+
+            <div className="space-y-2 pt-2 border-t border-border">
+              <Label className="text-muted-foreground">Promo code</Label>
+              {appliedPromo ? (
+                <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
+                  <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                    {appliedPromo.code} applied (−${appliedPromo.discountAmount.toFixed(2)})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRemovePromo}
+                    className="text-xs text-destructive hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter code"
+                    value={promoInput}
+                    onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                    className="uppercase"
+                    disabled={promoLoading}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleApplyPromo}
+                    disabled={promoLoading || !promoInput.trim()}
+                  >
+                    {promoLoading ? "Applying…" : "Apply"}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-border text-sm">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Subtotal</span>
+                <span>${subtotal.toFixed(2)}</span>
+              </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-green-600 dark:text-green-400">
+                  <span>Discount ({appliedPromo?.code})</span>
+                  <span>−${discountAmount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-muted-foreground">
+                <span>Shipping</span>
+                <span>${shippingFee.toFixed(2)}</span>
+              </div>
+            </div>
           </CardContent>
           <CardFooter className="flex flex-col items-stretch gap-2">
-            <div className="flex justify-between font-semibold">
+            <div className="flex justify-between font-semibold text-base">
               <span>Total</span>
               <span>${total.toFixed(2)}</span>
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
@@ -96,6 +96,18 @@ export function CategoriesAdminClient({ categories: initialCategories }: Categor
     router.refresh();
   };
 
+  const showOnHomeCount = categories.filter((c) => c.showOnHome).length;
+  const showOnHomeDisabled = showOnHomeCount >= 6 && !formShowOnHome;
+
+  const [sortByHomeFirst, setSortByHomeFirst] = useState(false);
+  const sortedCategories = useMemo(() => {
+    if (!sortByHomeFirst) return categories;
+    return [...categories].sort((a, b) => {
+      if (a.showOnHome === b.showOnHome) return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+      return a.showOnHome ? -1 : 1;
+    });
+  }, [categories, sortByHomeFirst]);
+
   const { getRootProps, getInputProps } = useDropzone({
     onDrop: (files) => files[0] && setFormImage(files[0]),
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp", ".gif"] },
@@ -146,10 +158,14 @@ export function CategoriesAdminClient({ categories: initialCategories }: Categor
             <Checkbox
               id="showOnHome"
               checked={formShowOnHome}
-              onCheckedChange={(c) => setFormShowOnHome(!!c)}
+              onCheckedChange={(c) => !showOnHomeDisabled && setFormShowOnHome(!!c)}
+              disabled={showOnHomeDisabled}
             />
-            <Label htmlFor="showOnHome" className="cursor-pointer">
-              Show on home page (max 6)
+            <Label
+              htmlFor="showOnHome"
+              className={showOnHomeDisabled ? "cursor-not-allowed text-muted-foreground" : "cursor-pointer"}
+            >
+              Show on home page (max 6{showOnHomeDisabled ? ", limit reached" : ""})
             </Label>
           </div>
           <div className="space-y-2">
@@ -181,12 +197,18 @@ export function CategoriesAdminClient({ categories: initialCategories }: Categor
               <th className="text-left p-4 font-medium">Image</th>
               <th className="text-left p-4 font-medium">Slug</th>
               <th className="text-left p-4 font-medium">Label</th>
-              <th className="text-left p-4 font-medium">Home</th>
+              <th
+                className="text-left p-4 font-medium cursor-pointer hover:bg-muted/80 select-none"
+                onClick={() => setSortByHomeFirst((prev) => !prev)}
+                title={sortByHomeFirst ? "Click to restore default order" : "Click to show Home=Yes first"}
+              >
+                Home {sortByHomeFirst && "↓"}
+              </th>
               <th className="text-right p-4 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {categories.map((cat) => (
+            {sortedCategories.map((cat) => (
               <tr key={cat.id} className="border-t border-border">
                 <td className="p-4">
                   <div className="w-12 h-16 relative bg-muted overflow-hidden">

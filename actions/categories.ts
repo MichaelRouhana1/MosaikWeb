@@ -56,6 +56,14 @@ export async function createCategory(formData: FormData): Promise<{ error?: stri
   const existing = await db.select().from(productCategories).where(eq(productCategories.slug, slug)).limit(1);
   if (existing.length > 0) return { error: "A category with this slug already exists" };
 
+  if (showOnHome) {
+    const homeCount = await db
+      .select({ id: productCategories.id })
+      .from(productCategories)
+      .where(eq(productCategories.showOnHome, true));
+    if (homeCount.length >= 6) return { error: "Maximum 6 categories can be shown on the home page" };
+  }
+
   let imageUrl: string | null = null;
   if (imageFile?.size) {
     const result = await uploadProductImage(imageFile, `category-${slug}-${Date.now()}`);
@@ -98,6 +106,14 @@ export async function updateCategory(
 
   const existingSlug = await db.select().from(productCategories).where(eq(productCategories.slug, slug)).limit(1);
   if (existingSlug.length > 0 && existingSlug[0].id !== id) return { error: "A category with this slug already exists" };
+
+  if (showOnHome && !existing.showOnHome) {
+    const homeCount = await db
+      .select({ id: productCategories.id })
+      .from(productCategories)
+      .where(eq(productCategories.showOnHome, true));
+    if (homeCount.length >= 6) return { error: "Maximum 6 categories can be shown on the home page" };
+  }
 
   let imageUrl: string | null = existing.image;
   if (imageFile?.size) {

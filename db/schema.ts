@@ -27,6 +27,12 @@ export const orderStatusEnum = pgEnum("order_status", [
   "CANCELLED",
 ]);
 
+export const promoDiscountTypeEnum = pgEnum("promo_discount_type", [
+  "PERCENTAGE",
+  "FIXED_AMOUNT",
+  "FREE_SHIPPING",
+]);
+
 // Product categories - admin-managed, slug used for shop filtering
 export const productCategories = pgTable("product_categories", {
   id: serial("id").primaryKey(),
@@ -75,6 +81,20 @@ export const productVariants = pgTable("product_variants", {
   stock: integer("stock").notNull().default(0),
 });
 
+// Promo codes
+export const promoCodes = pgTable("promo_codes", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  discountType: promoDiscountTypeEnum("discount_type").notNull(),
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  minOrderAmount: decimal("min_order_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  maxUses: integer("max_uses"),
+  currentUses: integer("current_uses").notNull().default(0),
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Orders
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
@@ -84,7 +104,11 @@ export const orders = pgTable("orders", {
   phoneNumber: text("phone_number").notNull(),
   addressLine1: text("address_line1").notNull(),
   city: text("city").notNull(),
+  subtotalAmount: decimal("subtotal_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  shippingFee: decimal("shipping_fee", { precision: 10, scale: 2 }).notNull().default("0"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  promoCodeId: integer("promo_code_id").references(() => promoCodes.id),
   status: orderStatusEnum("status").notNull().default("PENDING"),
   paymentMethod: text("payment_method").notNull().default("COD"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -125,7 +149,12 @@ export const productVariantsRelations = relations(productVariants, ({ one }) => 
   color: one(productColors),
 }));
 
-export const ordersRelations = relations(orders, ({ many }) => ({
+export const promoCodesRelations = relations(promoCodes, ({ many }) => ({
+  orders: many(orders),
+}));
+
+export const ordersRelations = relations(orders, ({ one, many }) => ({
+  promoCode: one(promoCodes),
   items: many(orderItems),
 }));
 
@@ -197,6 +226,9 @@ export type NewProductColor = typeof productColors.$inferInsert;
 
 export type ProductVariant = typeof productVariants.$inferSelect;
 export type NewProductVariant = typeof productVariants.$inferInsert;
+
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type NewPromoCode = typeof promoCodes.$inferInsert;
 
 export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;

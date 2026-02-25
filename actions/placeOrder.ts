@@ -9,7 +9,11 @@ import {
   orderItems,
   productVariants,
   products,
+  promoCodes,
 } from "@/db/schema";
+import { validatePromoInTransaction } from "@/actions/promo";
+
+const DEFAULT_SHIPPING_FEE = 5;
 
 const cartItemSchema = z.object({
   productId: z.coerce.number(),
@@ -27,6 +31,7 @@ const placeOrderSchema = z.object({
   addressLine1: z.string().min(1, "Address is required"),
   city: z.string().min(1, "City is required"),
   items: z.array(cartItemSchema).min(1, "Cart is empty"),
+  promoCode: z.string().trim().optional(),
 });
 
 export type CartItem = z.infer<typeof cartItemSchema>;
@@ -51,6 +56,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId: num
     addressLine1,
     city,
     items,
+    promoCode,
   } = parseResult.data;
 
   const orderResult = await db.transaction(async (tx) => {
@@ -102,10 +108,27 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId: num
         .where(eq(productVariants.id, variant.id));
     }
 
-    let totalAmount = 0;
-    for (const { quantity, priceAtPurchase } of variantQuantities.values()) {
-      totalAmount += quantity * parseFloat(priceAtPurchase);
+    const subtotalAmount = Array.from(variantQuantities.values()).reduce(
+      (sum, { quantity, priceAtPurchase }) => sum + quantity * parseFloat(priceAtPurchase),
+      0
+    );
+
+    let discountAmount = 0;
+    let promoCodeId: number | null = null;
+    const shippingFee = DEFAULT_SHIPPING_FEE;
+
+    if (promoCode?.trim()) {
+      const validated = await validatePromoInTransaction(
+        tx,
+        promoCode.trim(),
+        subtotalAmount,
+        shippingFee
+      );
+      discountAmount = validated.discountAmount;
+      promoCodeId = validated.promoCodeId;
     }
+
+    const totalAmount = Math.max(0, subtotalAmount - discountAmount + shippingFee);
 
     const [order] = await tx
       .insert(orders)
@@ -116,11 +139,22 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId: num
         phoneNumber,
         addressLine1,
         city,
+        subtotalAmount: subtotalAmount.toFixed(2),
+        discountAmount: discountAmount.toFixed(2),
+        shippingFee: shippingFee.toFixed(2),
         totalAmount: totalAmount.toFixed(2),
+        promoCodeId,
         status: "PENDING",
         paymentMethod,
       })
       .returning({ id: orders.id });
+
+    if (promoCodeId != null) {
+      await tx
+        .update(promoCodes)
+        .set({ currentUses: sql`${promoCodes.currentUses} + 1` })
+        .where(eq(promoCodes.id, promoCodeId));
+    }
 
     if (!order) {
       throw new Error("Failed to create order");

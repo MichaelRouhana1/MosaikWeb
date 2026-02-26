@@ -7,6 +7,7 @@ import { UserButton, useAuth } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import { useCart } from "@/context/CartContext";
 import { CartDrawer } from "@/components/CartDrawer";
+import { ShopDrawer } from "@/components/ShopDrawer";
 import { getCategories } from "@/actions/categories";
 import type { ProductCategory } from "@/actions/categories";
 
@@ -16,8 +17,8 @@ export function Navbar() {
   const { totalItems, setOpenCart } = useCart();
   const { theme, setTheme } = useTheme();
   const [cartOpen, setCartOpen] = useState(false);
+  const [shopDrawerOpen, setShopDrawerOpen] = useState(false);
   const [burgerOpen, setBurgerOpen] = useState(false);
-  const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
 
   const toggleTheme = () => {
@@ -67,51 +68,15 @@ export function Navbar() {
                 Dashboard
               </Link>
             )}
-            {/* Shop dropdown - desktop only */}
-            <div className="relative hidden lg:block">
-              <button
-                type="button"
-                onClick={() => setShopDropdownOpen((o) => !o)}
-                className="text-sm font-normal text-foreground hover:opacity-70 transition-opacity"
-                aria-expanded={shopDropdownOpen}
-                aria-haspopup="true"
-              >
-                Shop
-              </button>
-              {shopDropdownOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShopDropdownOpen(false)}
-                    aria-hidden
-                  />
-                  <div
-                    className="absolute left-0 top-full mt-1 z-50 min-w-[200px] bg-background border border-border shadow-lg py-2"
-                    role="menu"
-                  >
-                    <Link
-                      href="/shop"
-                      onClick={() => setShopDropdownOpen(false)}
-                      className="block px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50"
-                      role="menuitem"
-                    >
-                      View all
-                    </Link>
-                    {categories.map((cat) => (
-                      <Link
-                        key={cat.id}
-                        href={`/shop?category=CLOTHING&cat=${cat.slug}`}
-                        onClick={() => setShopDropdownOpen(false)}
-                        className="block px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50"
-                        role="menuitem"
-                      >
-                        {cat.label}
-                      </Link>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Shop - opens drawer like Cart */}
+            <button
+              type="button"
+              onClick={() => setShopDrawerOpen(true)}
+              className="hidden lg:inline text-sm font-normal text-foreground hover:opacity-70 transition-opacity"
+              aria-label="Open shop menu"
+            >
+              Shop
+            </button>
           </div>
 
           {/* Center: Logo */}
@@ -219,25 +184,20 @@ export function Navbar() {
             role="menu"
           >
             <div className="py-4 px-4 space-y-1">
-              <Link
-                href="/shop"
-                onClick={() => setBurgerOpen(false)}
-                className="block px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50"
+              <button
+                type="button"
+                onClick={() => {
+                  setShopDrawerOpen(true);
+                  setBurgerOpen(false);
+                }}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50 text-left"
                 role="menuitem"
               >
-                View all
-              </Link>
-              {categories.map((cat) => (
-                <Link
-                  key={cat.id}
-                  href={`/shop?category=CLOTHING&cat=${cat.slug}`}
-                  onClick={() => setBurgerOpen(false)}
-                  className="block px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50"
-                  role="menuitem"
-                >
-                  {cat.label}
-                </Link>
-              ))}
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+                Shop
+              </button>
               <div className="border-t border-border my-3" />
               <Link
                 href="/shop"
@@ -306,6 +266,11 @@ export function Navbar() {
         </>
       )}
 
+      <ShopDrawer
+        isOpen={shopDrawerOpen}
+        onClose={() => setShopDrawerOpen(false)}
+        categories={categories}
+      />
       <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
     </nav>
   );

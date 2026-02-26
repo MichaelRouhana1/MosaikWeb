@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { useCart } from "@/context/CartContext";
@@ -621,12 +620,6 @@ export function ProductDetailClient({
                 );
               })}
             </div>
-            <Link
-              href="#"
-              className="mt-2 inline-block text-xs font-normal text-muted-foreground hover:text-foreground underline underline-offset-2"
-            >
-              Size guide
-            </Link>
           </div>
 
           {!hasAnyInStock && (

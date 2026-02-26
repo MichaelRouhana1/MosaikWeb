@@ -9,7 +9,7 @@ import { toggleWishlist } from "@/actions/toggleWishlist";
 import { useCart } from "@/context/CartContext";
 import { getProductDisplayPrice, isProductOnSale, getProductDiscountPercent } from "@/lib/utils";
 import type { Product } from "@/db/schema";
-import type { ProductVariant } from "@/db/schema";
+import type { ProductVariant, ProductColor } from "@/db/schema";
 
 const DEFAULT_SIZES = ["XS", "S", "M", "L", "XL"];
 const PEXELS_PREFIX = "https://images.pexels.com/";
@@ -17,6 +17,7 @@ const PEXELS_PREFIX = "https://images.pexels.com/";
 interface ProductCardProps {
   product: Product;
   variants?: ProductVariant[];
+  colors?: ProductColor[] | null;
   inWishlist?: boolean;
   compact?: boolean;
 }
@@ -24,6 +25,7 @@ interface ProductCardProps {
 export function ProductCard({
   product,
   variants = [],
+  colors,
   inWishlist = false,
   compact = false,
 }: ProductCardProps) {
@@ -32,8 +34,14 @@ export function ProductCard({
   const { addToCart, openCart } = useCart();
   const [wishlistState, setWishlistState] = useState(inWishlist);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [selectedColorIndex, setSelectedColorIndex] = useState(0);
 
-  const imageUrls = (product as { images?: string[] }).images ?? [];
+  const hasMultipleColors = colors && colors.length > 1;
+  const activeColor = colors?.[selectedColorIndex];
+  const imageUrls =
+    activeColor?.imageUrls?.length
+      ? activeColor.imageUrls
+      : (product as { images?: string[] }).images ?? [];
   const hasMultipleImages = imageUrls.length > 1;
   const currentImage = imageUrls[currentImageIndex];
   const price = typeof product.price === "string" ? product.price : String(product.price);
@@ -41,14 +49,18 @@ export function ProductCard({
   const onSale = isProductOnSale(product);
   const percentOff = getProductDiscountPercent(product);
 
-  const variantMap = new Map(variants.map((v) => [v.size, v]));
-  const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
+  const variantsForColor =
+    colors && activeColor
+      ? variants.filter((v) => v.colorId === activeColor.id)
+      : variants;
+  const variantMap = new Map(variantsForColor.map((v) => [v.size, v]));
+  const totalStock = variantsForColor.reduce((sum, v) => sum + v.stock, 0);
   const isOutOfStock = totalStock === 0;
   const isSizeInStock = (size: string) => (variantMap.get(size)?.stock ?? 0) > 0;
 
   const sizes =
-    variants.length > 0
-      ? [...new Set(variants.map((v) => v.size))].sort(
+    variantsForColor.length > 0
+      ? [...new Set(variantsForColor.map((v) => v.size))].sort(
           (a, b) => DEFAULT_SIZES.indexOf(a) - DEFAULT_SIZES.indexOf(b)
         )
       : DEFAULT_SIZES;
@@ -81,23 +93,33 @@ export function ProductCard({
     setCurrentImageIndex((i) => (i + 1) % imageUrls.length);
   };
 
+  const handleColorClick = (e: React.MouseEvent, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedColorIndex(index);
+    setCurrentImageIndex(0);
+  };
+
   const handleSizeClick = (e: React.MouseEvent, size: string) => {
     e.preventDefault();
     e.stopPropagation();
     if (!isSizeInStock(size)) return;
+    const colorName = activeColor?.name ?? product.color ?? undefined;
+    const productImage = imageUrls[0];
     addToCart({
       productId: product.id,
       size,
       quantity: 1,
       priceAtPurchase: displayPrice,
       productName: product.name,
-      productImage: imageUrls[0],
-      productColor: product.color ?? undefined,
+      productImage,
+      productColor: colorName,
     });
     openCart();
   };
 
-  const colorLabel = product.color ?? product.description?.split(",")[0] ?? product.category ?? "—";
+  const colorLabel =
+    activeColor?.name ?? product.color ?? product.description?.split(",")[0] ?? product.category ?? "—";
 
   return (
     <article
@@ -252,27 +274,69 @@ export function ProductCard({
             </div>
           )}
         </div>
-        <div className={compact ? "mt-2" : "mt-3"}>
-          <h3
-            className={`font-light text-foreground truncate ${
-              compact ? "text-xs" : "text-sm"
-            }`}
-          >
-            {product.name}
-          </h3>
-          <p className="text-xs font-light text-muted-foreground mt-0.5">
-            {colorLabel}
-          </p>
-          <p className="text-sm font-light text-foreground mt-0.5">
-            {onSale ? (
-              <>
-                <span className="line-through text-muted-foreground">${price}</span>{" "}
-                <span className="text-destructive font-medium">${displayPrice}</span>
-              </>
-            ) : (
-              `$${displayPrice}`
-            )}
-          </p>
+        <div className={`flex items-start justify-between gap-2 ${compact ? "mt-2" : "mt-3"}`}>
+          <div className="min-w-0 flex-1">
+            <h3
+              className={`font-light text-foreground truncate ${
+                compact ? "text-xs" : "text-sm"
+              }`}
+            >
+              {product.name}
+            </h3>
+            <p className="text-xs font-light text-muted-foreground mt-0.5">
+              {colorLabel}
+              {hasMultipleColors && colors && (
+                <span className="ml-1 text-muted-foreground">
+                  +{colors.length - 1} {colors.length - 1 === 1 ? "Colour" : "Colours"}
+                </span>
+              )}
+            </p>
+            <p className="text-sm font-light text-foreground mt-0.5">
+              {onSale ? (
+                <>
+                  <span className="line-through text-muted-foreground">${price}</span>{" "}
+                  <span className="text-destructive font-medium">${displayPrice}</span>
+                </>
+              ) : (
+                `$${displayPrice}`
+              )}
+            </p>
+          </div>
+          {/* Color bubbles on the right - visible only on hover */}
+          {hasMultipleColors && colors && (
+            <div className="flex items-center gap-1.5 shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              {colors.map((color, i) => (
+                <button
+                  key={color.id}
+                  type="button"
+                  onClick={(e) => handleColorClick(e, i)}
+                  className={`relative shrink-0 rounded-full transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-foreground ${
+                    compact ? "w-4 h-4" : "w-5 h-5"
+                  } ${i === selectedColorIndex ? "border border-foreground" : "border-2 border-border"}`}
+                  style={
+                    color.hexCode
+                      ? { backgroundColor: color.hexCode }
+                      : undefined
+                  }
+                  aria-label={`Color: ${color.name}`}
+                  aria-pressed={i === selectedColorIndex}
+                >
+                  {!color.hexCode && color.imageUrls?.[0] && (
+                    <span className="absolute inset-0 block rounded-full overflow-hidden bg-muted">
+                      <Image
+                        src={color.imageUrls[0]}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        unoptimized={!color.imageUrls[0].startsWith(PEXELS_PREFIX)}
+                        sizes="20px"
+                      />
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </Link>
     </article>

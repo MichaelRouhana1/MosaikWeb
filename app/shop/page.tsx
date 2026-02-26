@@ -35,6 +35,15 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
         ])
       : [[], []];
 
+  const colorsByProductId = colorsList.reduce<Record<number, typeof productColors.$inferSelect[]>>(
+    (acc, c) => {
+      if (!acc[c.productId]) acc[c.productId] = [];
+      acc[c.productId].push(c);
+      return acc;
+    },
+    {}
+  );
+
   const firstImageByProductId: Record<number, string> = {};
   for (const c of colorsList) {
     if (!firstImageByProductId[c.productId] && c.imageUrls?.[0]) {
@@ -80,6 +89,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
         <ShopClient
           products={productsWithImages}
           variantsByProductId={variantsByProductId}
+          colorsByProductId={colorsByProductId}
           wishlistProductIds={wishlistProductIds}
           categoryLabel={categoryLabel}
         />

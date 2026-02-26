@@ -6,8 +6,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { CategoryHeader } from "@/components/CategoryHeader";
 import { UtilityBar, type SortOption } from "@/components/UtilityBar";
 import { FilterPanel, type FilterState } from "@/components/FilterPanel";
-import type { Product } from "@/db/schema";
-import type { ProductVariant } from "@/db/schema";
+import type { Product, ProductVariant, ProductColor } from "@/db/schema";
 
 const PRODUCTS_PER_PAGE = 12;
 const VALID_LEGACY_CATEGORIES = ["CLOTHING", "SHOES", "ACCESSORIES", "BAGS", "OTHER"] as const;
@@ -15,6 +14,7 @@ const VALID_LEGACY_CATEGORIES = ["CLOTHING", "SHOES", "ACCESSORIES", "BAGS", "OT
 interface ShopClientProps {
   products: Product[];
   variantsByProductId: Record<number, ProductVariant[]>;
+  colorsByProductId?: Record<number, ProductColor[]>;
   wishlistProductIds: number[];
   categoryLabel?: string | null;
 }
@@ -22,6 +22,7 @@ interface ShopClientProps {
 export function ShopClient({
   products,
   variantsByProductId,
+  colorsByProductId = {},
   wishlistProductIds,
   categoryLabel,
 }: ShopClientProps) {
@@ -175,6 +176,7 @@ export function ShopClient({
                   key={product.id}
                   product={product}
                   variants={variantsByProductId[product.id] ?? []}
+                  colors={colorsByProductId[product.id]}
                   inWishlist={wishlistProductIds.includes(product.id)}
                 />
               ))}

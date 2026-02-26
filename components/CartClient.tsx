@@ -87,7 +87,7 @@ export function CartClient({
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(340px,400px)] gap-8 lg:gap-12">
               {/* Product grid - 4 per row */}
-              <div className="min-w-0 grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="min-w-0 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
                 {items.map((item) => (
                   <div
                     key={item.sku}

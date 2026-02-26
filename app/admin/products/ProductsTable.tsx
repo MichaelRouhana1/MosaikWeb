@@ -31,7 +31,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { deleteProduct } from "@/actions/deleteProduct";
-import { applyBulkDiscount, removeBulkDiscount } from "@/actions/bulk-discount";
+import { applyBulkDiscount, removeBulkDiscount, clearExpiredSales } from "@/actions/bulk-discount";
+import { getProductDisplayPrice, isProductOnSale, getProductDiscountPercent } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface ProductWithMeta {
@@ -40,6 +41,9 @@ interface ProductWithMeta {
   description: string | null;
   price: string;
   salePrice: string | null;
+  saleStartsAt?: Date | string | null;
+  saleEndsAt?: Date | string | null;
+  isSaleActive?: boolean;
   category: string;
   images: string[];
   isVisible: boolean;
@@ -76,8 +80,11 @@ export function ProductsTable({
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const [discountPercent, setDiscountPercent] = useState("");
+  const [saleStartDate, setSaleStartDate] = useState("");
+  const [saleEndDate, setSaleEndDate] = useState("");
   const [isApplying, setIsApplying] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [isClearingExpired, setIsClearingExpired] = useState(false);
 
   const handleSearch = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -115,11 +122,16 @@ export function ProductsTable({
     }
     setIsApplying(true);
     try {
-      await applyBulkDiscount(selectedIds, "PERCENTAGE", pct);
+      const options: { saleStartsAt?: Date | string | null; saleEndsAt?: Date | string | null } = {};
+      if (saleStartDate) options.saleStartsAt = saleStartDate;
+      if (saleEndDate) options.saleEndsAt = saleEndDate;
+      await applyBulkDiscount(selectedIds, "PERCENTAGE", pct, options);
       toast.success(`Discount applied to ${selectedCount} product(s)`);
       setRowSelection({});
       setDiscountModalOpen(false);
       setDiscountPercent("");
+      setSaleStartDate("");
+      setSaleEndDate("");
       router.refresh();
     } catch {
       toast.error("Failed to apply discount");
@@ -127,6 +139,14 @@ export function ProductsTable({
       setIsApplying(false);
     }
   };
+
+  const previewProduct = products.find((p) => selectedIds.includes(p.id));
+  const previewOriginal = previewProduct ? parseFloat(String(previewProduct.price)) : 0;
+  const previewPct = parseFloat(discountPercent);
+  const previewNew =
+    Number.isFinite(previewPct) && previewPct > 0 && previewPct < 100
+      ? previewOriginal * (1 - previewPct / 100)
+      : 0;
 
   const handleRemoveDiscount = async () => {
     setIsRemoving(true);
@@ -139,6 +159,19 @@ export function ProductsTable({
       toast.error("Failed to remove discount");
     } finally {
       setIsRemoving(false);
+    }
+  };
+
+  const handleClearExpiredSales = async () => {
+    setIsClearingExpired(true);
+    try {
+      const { cleared } = await clearExpiredSales();
+      toast.success(cleared > 0 ? `Cleared ${cleared} expired sale(s)` : "No expired sales found");
+      router.refresh();
+    } catch {
+      toast.error("Failed to clear expired sales");
+    } finally {
+      setIsClearingExpired(false);
     }
   };
 
@@ -216,13 +249,21 @@ export function ProductsTable({
       cell: ({ row }) => {
         const p = row.original;
         const price = typeof p.price === "string" ? p.price : String(p.price);
-        const salePrice = p.salePrice;
+        const onSale = isProductOnSale(p);
+        const displayPrice = getProductDisplayPrice(p);
+        const discountPct = getProductDiscountPercent(p);
         return (
-          <span>
-            {salePrice ? (
+          <span className="flex items-center gap-2">
+            {onSale ? (
               <>
-                <span className="line-through text-muted-foreground">${price}</span>{" "}
-                <span className="text-destructive font-medium">${salePrice}</span>
+                <span className="line-through text-muted-foreground">${price}</span>
+                <span className="text-destructive font-medium">${displayPrice}</span>
+                <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold uppercase bg-destructive/20 text-destructive rounded">
+                  Sale
+                </span>
+                {discountPct > 0 && (
+                  <span className="text-[10px] text-muted-foreground">{discountPct}% OFF</span>
+                )}
               </>
             ) : (
               `$${price}`
@@ -286,19 +327,19 @@ export function ProductsTable({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Input
           placeholder="Search by name..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          className="max-w-xs"
+          className="w-full sm:max-w-xs"
         />
         <Button onClick={handleSearch} variant="default">
           Search
         </Button>
         <Select value={category} onValueChange={handleCategoryChange}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="All categories" />
           </SelectTrigger>
           <SelectContent>
@@ -312,6 +353,14 @@ export function ProductsTable({
             ))}
           </SelectContent>
         </Select>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleClearExpiredSales}
+          disabled={isClearingExpired}
+        >
+          {isClearingExpired ? "Clearing…" : "Clear expired sales"}
+        </Button>
       </div>
 
       {selectedCount > 0 && (
@@ -340,8 +389,8 @@ export function ProductsTable({
         </div>
       )}
 
-      <div className="border border-border rounded-md overflow-visible">
-        <table className="w-full text-sm">
+      <div className="border border-border rounded-md overflow-x-auto">
+        <table className="w-full text-sm min-w-[800px]">
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="bg-muted/50">
@@ -396,10 +445,7 @@ export function ProductsTable({
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label
-                htmlFor="discount-percent"
-                className="text-sm font-medium"
-              >
+              <label htmlFor="discount-percent" className="text-sm font-medium">
                 Discount percentage
               </label>
               <Input
@@ -412,12 +458,42 @@ export function ProductsTable({
                 onChange={(e) => setDiscountPercent(e.target.value)}
               />
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="sale-start" className="text-sm font-medium">
+                  Start date (optional)
+                </label>
+                <Input
+                  id="sale-start"
+                  type="datetime-local"
+                  value={saleStartDate}
+                  onChange={(e) => setSaleStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="sale-end" className="text-sm font-medium">
+                  End date (optional)
+                </label>
+                <Input
+                  id="sale-end"
+                  type="datetime-local"
+                  value={saleEndDate}
+                  onChange={(e) => setSaleEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+            {previewProduct && (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+                <p className="font-medium mb-2">Preview</p>
+                <p className="text-muted-foreground">
+                  Original: ${previewOriginal.toFixed(2)} → New: $
+                  {Number.isFinite(previewNew) ? previewNew.toFixed(2) : "—"}
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDiscountModalOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setDiscountModalOpen(false)}>
               Cancel
             </Button>
             <Button

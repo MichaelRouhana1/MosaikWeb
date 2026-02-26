@@ -1,0 +1,111 @@
+/**
+ * Security utilities for OWASP hardening: XSS prevention, file upload validation, filename sanitization.
+ */
+
+/** Allowed image extensions and MIME types for product/hero/lookbook uploads */
+export const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp"] as const;
+export const ALLOWED_IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+] as const;
+
+/** Allowed video extensions and MIME types for home video upload */
+export const ALLOWED_VIDEO_EXTENSIONS = ["mp4", "webm"] as const;
+export const ALLOWED_VIDEO_MIME_TYPES = [
+  "video/mp4",
+  "video/webm",
+] as const;
+
+/** Max file sizes in bytes */
+export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+export const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+
+/**
+ * Escapes HTML special characters to prevent XSS when interpolating user input into HTML.
+ */
+export function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Sanitizes a filename by removing path traversal and control characters.
+ * Returns a safe basename-only string.
+ */
+export function sanitizeFilename(name: string): string {
+  if (!name || typeof name !== "string") return "file";
+  // Remove path segments and normalize
+  const basename = name.replace(/^.*[/\\]/, "").trim();
+  // Strip path traversal and dangerous chars
+  const safe = basename.replace(/[<>:"/\\|?*\x00-\x1f]/g, "").replace(/\.{2,}/g, "");
+  return safe || "file";
+}
+
+/**
+ * Validates href for safe use (no javascript: or other schemes). Allows relative paths and https only.
+ */
+export function validateHref(href: string): { ok: true; href: string } | { ok: false; error: string } {
+  const trimmed = (href || "").trim();
+  if (!trimmed) return { ok: true, href: "/" };
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith("javascript:") || lower.startsWith("data:") || lower.startsWith("vbscript:")) {
+    return { ok: false, error: "Invalid link URL" };
+  }
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+    return { ok: true, href: trimmed };
+  }
+  if (lower.startsWith("https://")) {
+    return { ok: true, href: trimmed };
+  }
+  return { ok: false, error: "Link must be a relative path (/) or https:// URL" };
+}
+
+export type UploadFileKind = "image" | "video";
+
+export type ValidateUploadFileResult =
+  | { ok: true; ext: string }
+  | { ok: false; error: string };
+
+/**
+ * Validates file type (extension + MIME), size, and returns a safe extension.
+ * Use before uploading to storage. MIME is client-provided so we validate extension first and require MIME to match allowed set.
+ */
+export function validateUploadFile(
+  file: { name: string; type: string; size: number },
+  kind: UploadFileKind
+): ValidateUploadFileResult {
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  const allowedExts: readonly string[] = kind === "image" ? ALLOWED_IMAGE_EXTENSIONS : ALLOWED_VIDEO_EXTENSIONS;
+  const allowedMimes: readonly string[] = kind === "image" ? ALLOWED_IMAGE_MIME_TYPES : ALLOWED_VIDEO_MIME_TYPES;
+  const maxSize = kind === "image" ? MAX_IMAGE_SIZE_BYTES : MAX_VIDEO_SIZE_BYTES;
+
+  if (!ext || !allowedExts.includes(ext)) {
+    return {
+      ok: false,
+      error: `Invalid file type. Allowed: ${allowedExts.join(", ")}`,
+    };
+  }
+
+  if (!allowedMimes.includes(file.type)) {
+    return {
+      ok: false,
+      error: `Invalid MIME type. Allowed: ${allowedMimes.join(", ")}`,
+    };
+  }
+
+  if (file.size <= 0) {
+    return { ok: false, error: "File is empty" };
+  }
+  if (file.size > maxSize) {
+    const maxMB = kind === "image" ? 5 : 50;
+    return { ok: false, error: `File too large. Maximum ${maxMB}MB` };
+  }
+
+  return { ok: true, ext };
+}

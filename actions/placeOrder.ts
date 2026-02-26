@@ -1,8 +1,9 @@
 "use server";
 
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { Resend } from "resend";
+import { headers } from "next/headers";
 import { db } from "@/db";
 import {
   orders,
@@ -12,6 +13,9 @@ import {
   promoCodes,
 } from "@/db/schema";
 import { validatePromoInTransaction } from "@/actions/promo";
+import { getProductDisplayPrice } from "@/lib/utils";
+import { escapeHtml } from "@/lib/security";
+import { checkPlaceOrderLimit } from "@/lib/rate-limit";
 
 const DEFAULT_SHIPPING_FEE = 5;
 
@@ -38,6 +42,14 @@ export type CartItem = z.infer<typeof cartItemSchema>;
 export type PlaceOrderInput = z.infer<typeof placeOrderSchema>;
 
 export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId: number }> {
+  const headersList = await headers();
+  const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headersList.get("x-real-ip") ?? "unknown";
+  const identifier = input.userId ?? input.guestEmail ?? ip;
+  const limit = checkPlaceOrderLimit(identifier);
+  if (!limit.allowed) {
+    throw new Error(`Too many orders. Please try again in ${Math.ceil(limit.retryAfterMs / 60000)} minute(s).`);
+  }
+
   const parseResult = placeOrderSchema.safeParse(input);
   if (!parseResult.success) {
     const firstError = parseResult.error.flatten().fieldErrors;
@@ -60,12 +72,23 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId: num
   } = parseResult.data;
 
   const orderResult = await db.transaction(async (tx) => {
+    const productIds = [...new Set(items.map((i) => i.productId))];
+    const productRows = await tx
+      .select()
+      .from(products)
+      .where(inArray(products.id, productIds));
+    const productById = Object.fromEntries(productRows.map((p) => [p.id, p]));
+
     const variantQuantities = new Map<
       string,
       { productId: number; size: string; quantity: number; priceAtPurchase: string }
     >();
     for (const item of items) {
       const key = `${item.productId}|${item.size}`;
+      const product = productById[item.productId];
+      const priceAtPurchase = product
+        ? getProductDisplayPrice(product)
+        : item.priceAtPurchase;
       const existing = variantQuantities.get(key);
       if (existing) {
         existing.quantity += item.quantity;
@@ -74,7 +97,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId: num
           productId: item.productId,
           size: item.size,
           quantity: item.quantity,
-          priceAtPurchase: item.priceAtPurchase,
+          priceAtPurchase,
         });
       }
     }
@@ -160,13 +183,18 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId: num
       throw new Error("Failed to create order");
     }
 
-    const orderItemsToInsert = items.map((item) => ({
-      orderId: order.id,
-      productId: item.productId,
-      quantity: item.quantity,
-      size: item.size,
-      priceAtPurchase: item.priceAtPurchase,
-    }));
+    const orderItemsToInsert = items.map((item) => {
+      const key = `${item.productId}|${item.size}`;
+      const vq = variantQuantities.get(key);
+      const priceAtPurchase = vq?.priceAtPurchase ?? item.priceAtPurchase;
+      return {
+        orderId: order.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        size: item.size,
+        priceAtPurchase,
+      };
+    });
 
     await tx.insert(orderItems).values(orderItemsToInsert);
 
@@ -178,19 +206,22 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId: num
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
       const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+      const safeName = escapeHtml(customerName);
+      const safeAddress = escapeHtml(addressLine1);
+      const safeCity = escapeHtml(city);
       await resend.emails.send({
         from: fromEmail,
         to: emailTo,
         subject: `Order #${orderResult.orderId} confirmed`,
         html: `
           <h1>Order Confirmed</h1>
-          <p>Hi ${customerName},</p>
+          <p>Hi ${safeName},</p>
           <p>Thank you for your order. Your order #${orderResult.orderId} has been placed successfully.</p>
-          <p><strong>Total:</strong> $${orderResult.totalAmount}</p>
+          <p><strong>Total:</strong> $${escapeHtml(orderResult.totalAmount)}</p>
           <p><strong>Payment:</strong> Cash on Delivery (COD)</p>
           <p><strong>Delivery address:</strong><br/>
-          ${addressLine1}<br/>
-          ${city}</p>
+          ${safeAddress}<br/>
+          ${safeCity}</p>
         `,
       });
     } catch (err) {

@@ -7,6 +7,7 @@ import { getHeroImages } from "@/actions/hero";
 import { getHomeVideo } from "@/actions/video";
 import { getLookbookItems, getLookbookSectionVisible } from "@/actions/lookbook";
 import { getCategoriesForHome } from "@/actions/categories";
+import { getProductDisplayPrice, isProductOnSale, getProductDiscountPercent } from "@/lib/utils";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { VideoMuteToggle } from "@/components/VideoMuteToggle";
 import { NewsletterForm } from "@/components/NewsletterForm";
@@ -115,7 +116,7 @@ export default async function HomePage() {
               Designed to work together.
             </p>
           </div>
-          <VideoMuteToggle videoSrc={homeVideo?.videoUrl ?? "/images/copy_1FA36497-0DD6-4C57-B22C-B21E1C628908.MOV"} />
+          <VideoMuteToggle videoSrc={homeVideo?.videoUrl ?? "/images/copy_1FA36497-0DD6-4C57-B22C-B21E1C628908.MOV"} className="max-h-[70vh]" />
         </div>
       </section>
 
@@ -154,13 +155,9 @@ export default async function HomePage() {
             discoverProducts.map((product) => {
               const imageUrl = product.images?.[0] ?? PEXELS(708440, 440, 660);
               const price = typeof product.price === "string" ? product.price : String(product.price);
-              const salePrice = product.salePrice
-                ? (typeof product.salePrice === "string" ? product.salePrice : String(product.salePrice))
-                : null;
-              const percentOff =
-                salePrice && parseFloat(price) > 0
-                  ? Math.round((1 - parseFloat(salePrice) / parseFloat(price)) * 100)
-                  : 0;
+              const displayPrice = getProductDisplayPrice(product);
+              const onSale = isProductOnSale(product);
+              const percentOff = getProductDiscountPercent(product);
               return (
                 <Link
                   key={product.id}
@@ -168,7 +165,7 @@ export default async function HomePage() {
                   className="flex-shrink-0 w-[220px] group"
                 >
                   <div className="aspect-[2/3] overflow-hidden mb-4 relative">
-                    {percentOff > 0 && (
+                    {onSale && percentOff > 0 && (
                       <span className="absolute top-2 left-2 z-10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider bg-destructive text-destructive-foreground">
                         -{percentOff}%
                       </span>
@@ -183,13 +180,13 @@ export default async function HomePage() {
                   </div>
                   <p className="text-sm font-normal text-foreground">{product.name}</p>
                   <p className="text-sm font-light text-muted-foreground mt-1">
-                    {salePrice ? (
+                    {onSale ? (
                       <>
                         <span className="line-through">${price}</span>{" "}
-                        <span className="text-destructive font-medium">${salePrice}</span>
+                        <span className="text-destructive font-medium">${displayPrice}</span>
                       </>
                     ) : (
-                      `$${price}`
+                      `$${displayPrice}`
                     )}
                   </p>
                 </Link>
@@ -214,7 +211,7 @@ export default async function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-border bg-muted py-16 px-6">
-        <div className="max-w-[1400px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-12">
+        <div className="max-w-[1400px] mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12">
           <div>
             <h3 className="text-sm font-medium text-foreground mb-4">Customer Support</h3>
             <ul className="space-y-2">

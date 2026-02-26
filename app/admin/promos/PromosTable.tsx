@@ -45,8 +45,8 @@ export function PromosTable({ promos }: PromosTableProps) {
     p.expiresAt ? new Date(p.expiresAt).toLocaleDateString() : "—";
 
   return (
-    <div className="border border-border rounded-md overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="border border-border rounded-md overflow-x-auto">
+      <table className="w-full text-sm min-w-[700px]">
         <thead>
           <tr className="bg-muted/50">
             <th className="text-left px-4 py-3 font-medium uppercase tracking-wider text-muted-foreground">

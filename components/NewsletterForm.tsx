@@ -7,7 +7,7 @@ export function NewsletterForm() {
         <p className="text-sm font-normal text-foreground mb-6">
           Receive updates when new pieces are released.
         </p>
-        <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
+        <form className="flex flex-col sm:flex-row gap-2" onSubmit={(e) => e.preventDefault()}>
           <input
             type="email"
             placeholder="Email"

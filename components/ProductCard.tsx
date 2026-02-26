@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { toggleWishlist } from "@/actions/toggleWishlist";
 import { useCart } from "@/context/CartContext";
+import { getProductDisplayPrice, isProductOnSale, getProductDiscountPercent } from "@/lib/utils";
 import type { Product } from "@/db/schema";
 import type { ProductVariant } from "@/db/schema";
 
@@ -36,14 +37,9 @@ export function ProductCard({
   const hasMultipleImages = imageUrls.length > 1;
   const currentImage = imageUrls[currentImageIndex];
   const price = typeof product.price === "string" ? product.price : String(product.price);
-  const salePrice = product.salePrice
-    ? (typeof product.salePrice === "string" ? product.salePrice : String(product.salePrice))
-    : null;
-  const displayPrice = salePrice ?? price;
-  const percentOff =
-    salePrice && parseFloat(price) > 0
-      ? Math.round((1 - parseFloat(salePrice) / parseFloat(price)) * 100)
-      : 0;
+  const displayPrice = getProductDisplayPrice(product);
+  const onSale = isProductOnSale(product);
+  const percentOff = getProductDiscountPercent(product);
 
   const variantMap = new Map(variants.map((v) => [v.size, v]));
   const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
@@ -113,7 +109,7 @@ export function ProductCard({
             compact ? "" : ""
           }`}
         >
-          {percentOff > 0 && (
+          {onSale && percentOff > 0 && (
             <span className="absolute top-2 left-2 z-10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider bg-destructive text-destructive-foreground">
               -{percentOff}%
             </span>
@@ -268,13 +264,13 @@ export function ProductCard({
             {colorLabel}
           </p>
           <p className="text-sm font-light text-foreground mt-0.5">
-            {salePrice ? (
+            {onSale ? (
               <>
                 <span className="line-through text-muted-foreground">${price}</span>{" "}
-                <span className="text-destructive font-medium">${salePrice}</span>
+                <span className="text-destructive font-medium">${displayPrice}</span>
               </>
             ) : (
-              `$${price}`
+              `$${displayPrice}`
             )}
           </p>
         </div>

@@ -6,6 +6,8 @@ import { asc, eq, max } from "drizzle-orm";
 import { db } from "@/db";
 import { lookbookItems, sectionSettings } from "@/db/schema";
 import { uploadLookImage } from "@/lib/uploadImages";
+import { validateHref } from "@/lib/security";
+import { auditLog } from "@/lib/audit";
 
 const LOOKBOOK_SECTION_KEY = "lookbook";
 
@@ -21,8 +23,11 @@ export async function getLookbookSectionVisible(): Promise<boolean> {
 
 /** Sets whether the Get the Look section is visible. Admin only. */
 export async function setLookbookSectionVisible(visible: boolean) {
-  const { sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "lookbook.visibility" });
+    redirect("/");
+  }
 
   const [existing] = await db
     .select()
@@ -53,8 +58,11 @@ export async function getLookbookItems() {
 
 /** Fetches all lookbook items for admin. */
 export async function getAllLookbookItems() {
-  const { sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "lookbook.list" });
+    redirect("/");
+  }
   return db
     .select()
     .from(lookbookItems)
@@ -62,28 +70,48 @@ export async function getAllLookbookItems() {
 }
 
 export async function deleteLookbookItem(id: number) {
-  const { sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "lookbook.delete" });
+    redirect("/");
+  }
   await db.delete(lookbookItems).where(eq(lookbookItems.id, id));
+  auditLog({ userId: userId!, action: "lookbook.delete", target: String(id) });
 }
 
 export async function updateLookbookItem(
   id: number,
   data: { label?: string; href?: string; order?: number }
 ) {
-  const { sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
-  await db.update(lookbookItems).set(data).where(eq(lookbookItems.id, id));
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "lookbook.update" });
+    redirect("/");
+  }
+  const updateData: { label?: string; href?: string; order?: number } = { ...data };
+  if (data.href !== undefined) {
+    const validated = validateHref(data.href);
+    if (!validated.ok) throw new Error(validated.error);
+    updateData.href = validated.href;
+  }
+  await db.update(lookbookItems).set(updateData).where(eq(lookbookItems.id, id));
+  auditLog({ userId: userId!, action: "lookbook.update", target: String(id), details: data });
 }
 
 /** Uploads a look image and adds it to the database. Admin only. */
 export async function addLookbookItemFromFile(formData: FormData): Promise<{ error?: string }> {
-  const { sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "lookbook.add" });
+    redirect("/");
+  }
 
   const file = formData.get("image") as File | null;
   const label = (formData.get("label") as string)?.trim();
-  const href = ((formData.get("href") as string)?.trim()) || "/shop";
+  const hrefRaw = ((formData.get("href") as string)?.trim()) || "/shop";
+  const hrefValidation = validateHref(hrefRaw);
+  if (!hrefValidation.ok) return { error: hrefValidation.error };
+  const href = hrefValidation.href;
 
   if (!file?.size) return { error: "No image provided" };
   if (!label) return { error: "Label is required" };
@@ -97,11 +125,12 @@ export async function addLookbookItemFromFile(formData: FormData): Promise<{ err
     .from(lookbookItems);
   const nextOrder = (maxOrder ?? -1) + 1;
 
-  await db.insert(lookbookItems).values({
+  const [inserted] = await db.insert(lookbookItems).values({
     label,
     imageUrl: result.url,
     href,
     order: nextOrder,
-  });
+  }).returning({ id: lookbookItems.id });
+  if (inserted) auditLog({ userId: userId!, action: "lookbook.add", target: String(inserted.id), details: { label } });
   return {};
 }

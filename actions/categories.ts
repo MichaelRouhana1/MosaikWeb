@@ -6,6 +6,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { productCategories } from "@/db/schema";
 import { uploadProductImage } from "@/lib/uploadImages";
+import { auditLog } from "@/lib/audit";
 
 export type ProductCategory = typeof productCategories.$inferSelect;
 
@@ -35,15 +36,21 @@ export async function getCategoriesForHome(): Promise<ProductCategory[]> {
 
 /** Admin: get all categories */
 export async function getAllCategories(): Promise<ProductCategory[]> {
-  const { sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "category.list" });
+    redirect("/");
+  }
   return getCategories();
 }
 
 /** Admin: create category */
 export async function createCategory(formData: FormData): Promise<{ error?: string }> {
-  const { sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "category.create" });
+    redirect("/");
+  }
 
   const slug = (formData.get("slug") as string)?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
   const label = (formData.get("label") as string)?.trim();
@@ -82,6 +89,7 @@ export async function createCategory(formData: FormData): Promise<{ error?: stri
     showOnHome,
     sortOrder: nextSortOrder,
   });
+  auditLog({ userId: userId!, action: "category.create", target: slug, details: { label } });
   return {};
 }
 
@@ -90,8 +98,11 @@ export async function updateCategory(
   id: number,
   formData: FormData
 ): Promise<{ error?: string }> {
-  const { sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "category.update" });
+    redirect("/");
+  }
 
   const slug = (formData.get("slug") as string)?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
   const label = (formData.get("label") as string)?.trim();
@@ -126,17 +137,22 @@ export async function updateCategory(
     .update(productCategories)
     .set({ slug, label, image: imageUrl, showOnHome })
     .where(eq(productCategories.id, id));
+  auditLog({ userId: userId!, action: "category.update", target: String(id), details: { slug, label } });
   return {};
 }
 
 /** Admin: delete category */
 export async function deleteCategory(id: number): Promise<{ error?: string }> {
-  const { sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "category.delete" });
+    redirect("/");
+  }
 
   const [existing] = await db.select().from(productCategories).where(eq(productCategories.id, id)).limit(1);
   if (!existing) return { error: "Category not found" };
 
   await db.delete(productCategories).where(eq(productCategories.id, id));
+  auditLog({ userId: userId!, action: "category.delete", target: String(id), details: { slug: existing.slug } });
   return {};
 }

@@ -2,9 +2,12 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { promoCodes } from "@/db/schema";
+import { checkValidatePromoLimit } from "@/lib/rate-limit";
+import { auditLog } from "@/lib/audit";
 
 const DEFAULT_SHIPPING_FEE = 5;
 
@@ -94,6 +97,12 @@ export async function validatePromoCode(
   cartSubtotal: number,
   shippingFee: number = DEFAULT_SHIPPING_FEE
 ): Promise<ValidatePromoResult> {
+  const headersList = await headers();
+  const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headersList.get("x-real-ip") ?? "unknown";
+  const limit = checkValidatePromoLimit(ip);
+  if (!limit.allowed) {
+    throw new Error("Too many attempts. Please try again in a moment.");
+  }
   const result = await validateAndGetPromo(db, code, cartSubtotal, shippingFee);
   return {
     discountAmount: result.discountAmount,
@@ -122,15 +131,12 @@ export async function validatePromoInTransaction(
 
 // --- Admin CRUD ---
 
-async function requireAdmin() {
+export async function createPromoCode(formData: FormData): Promise<{ error?: string; id?: number }> {
   const { userId, sessionClaims } = await auth();
   if (!userId || sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "promo.create" });
     redirect("/");
   }
-}
-
-export async function createPromoCode(formData: FormData): Promise<{ error?: string; id?: number }> {
-  await requireAdmin();
   const code = (formData.get("code") as string)?.trim().toUpperCase();
   const discountType = formData.get("discountType") as string;
   const discountValue = parseFloat(String(formData.get("discountValue") ?? 0));
@@ -161,6 +167,7 @@ export async function createPromoCode(formData: FormData): Promise<{ error?: str
       })
       .returning({ id: promoCodes.id });
     if (!inserted) return { error: "Failed to create promo code" };
+    auditLog({ userId, action: "promo.create", target: String(inserted.id), details: { code } });
     return { id: inserted.id };
   } catch (e) {
     if (e && typeof e === "object" && "code" in e && (e as { code: string }).code === "23505") {
@@ -171,18 +178,29 @@ export async function createPromoCode(formData: FormData): Promise<{ error?: str
 }
 
 export async function togglePromoStatus(id: number): Promise<{ error?: string }> {
-  await requireAdmin();
+  const { userId, sessionClaims } = await auth();
+  if (!userId || sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "promo.toggle_status" });
+    redirect("/");
+  }
   const [promo] = await db.select().from(promoCodes).where(eq(promoCodes.id, id)).limit(1);
   if (!promo) return { error: "Promo not found" };
   await db
     .update(promoCodes)
     .set({ isActive: !promo.isActive })
     .where(eq(promoCodes.id, id));
+  auditLog({ userId, action: "promo.toggle_status", target: String(id), details: { code: promo.code, isActive: !promo.isActive } });
   return {};
 }
 
 export async function deletePromoCode(id: number): Promise<{ error?: string }> {
-  await requireAdmin();
+  const { userId, sessionClaims } = await auth();
+  if (!userId || sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "promo.delete" });
+    redirect("/");
+  }
+  const [promo] = await db.select({ code: promoCodes.code }).from(promoCodes).where(eq(promoCodes.id, id)).limit(1);
   await db.delete(promoCodes).where(eq(promoCodes.id, id));
+  auditLog({ userId, action: "promo.delete", target: String(id), details: promo ? { code: promo.code } : undefined });
   return {};
 }

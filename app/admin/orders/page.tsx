@@ -13,8 +13,8 @@ export default async function AdminOrdersPage() {
     <div>
       <h1 className="text-2xl font-bold mb-8">Orders</h1>
 
-      <div className="border border-border rounded-md overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="border border-border rounded-md overflow-x-auto">
+        <table className="w-full text-sm min-w-[600px]">
           <thead>
             <tr className="bg-muted/50">
               <th className="text-left px-4 py-3 font-medium uppercase tracking-wider text-muted-foreground">

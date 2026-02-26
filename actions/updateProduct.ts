@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { products, productVariants, productColors } from "@/db/schema";
 import { uploadProductImage } from "@/lib/uploadImages";
 import { getValidCategorySlugs } from "@/actions/categories";
+import { auditLog } from "@/lib/audit";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
@@ -16,6 +17,7 @@ export async function updateProduct(
 ): Promise<{ error?: string }> {
   const { userId, sessionClaims } = await auth();
   if (!userId || sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "product.update" });
     redirect("/");
   }
 
@@ -163,5 +165,6 @@ export async function updateProduct(
     }
   });
 
+  auditLog({ userId, action: "product.update", target: String(productId), details: { name } });
   return {};
 }

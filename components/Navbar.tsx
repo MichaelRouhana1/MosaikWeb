@@ -122,18 +122,19 @@ export function Navbar() {
             MOSAIK
           </Link>
 
-          {/* Right: Search, Theme toggle, Account, Cart - desktop only */}
-          <div className="hidden lg:flex items-center gap-6 sm:gap-8 shrink-0">
+          {/* Right: icons always visible, text links desktop only */}
+          <div className="flex items-center gap-3 lg:gap-6 shrink-0">
+            {/* Desktop-only text links */}
             <Link
               href="/shop"
-              className="text-sm font-normal text-foreground hover:opacity-70 transition-opacity"
+              className="hidden lg:inline text-sm font-normal text-foreground hover:opacity-70 transition-opacity"
             >
               Search
             </Link>
             <button
               type="button"
               onClick={toggleTheme}
-              className="p-2 text-foreground hover:opacity-70 transition-opacity"
+              className="hidden lg:inline-flex p-2 text-foreground hover:opacity-70 transition-opacity"
               aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
               {theme === "dark" ? (
@@ -146,7 +147,7 @@ export function Navbar() {
                 </svg>
               )}
             </button>
-            <div className="flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-2">
               <Link
                 href="/account"
                 className="text-sm font-normal text-foreground hover:opacity-70 transition-opacity"
@@ -162,13 +163,24 @@ export function Navbar() {
                 }}
               />
             </div>
+            {/* Account icon - mobile/tablet only */}
+            <Link
+              href="/account"
+              className="lg:hidden p-2 text-foreground hover:opacity-70 transition-opacity"
+              aria-label="Account"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+            </Link>
+            {/* Cart button - always visible */}
             <button
               type="button"
               onClick={() => setCartOpen(true)}
-              className="flex items-center gap-2 text-sm font-normal text-foreground hover:opacity-70 transition-opacity"
+              className="flex items-center gap-2 text-foreground hover:opacity-70 transition-opacity"
               aria-label="Cart"
             >
-              Cart
+              <span className="hidden lg:inline text-sm font-normal">Cart</span>
               <span className="relative">
                 <svg
                   className="w-5 h-5"

@@ -6,12 +6,14 @@ import { db } from "@/db";
 import { products, productVariants, productColors } from "@/db/schema";
 import { uploadProductImage } from "@/lib/uploadImages";
 import { getValidCategorySlugs } from "@/actions/categories";
+import { auditLog } from "@/lib/audit";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
 export async function createProduct(formData: FormData): Promise<{ error?: string; productId?: number }> {
   const { userId, sessionClaims } = await auth();
   if (!userId || sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "product.create" });
     redirect("/");
   }
 
@@ -113,5 +115,6 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
     return product.id;
   });
 
+  auditLog({ userId, action: "product.create", target: String(productId), details: { name } });
   return { productId };
 }

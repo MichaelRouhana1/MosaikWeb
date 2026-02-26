@@ -6,12 +6,14 @@ import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { auditLog } from "@/lib/audit";
 
 const VALID_STATUSES = ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"] as const;
 
 export async function updateOrderStatus(orderId: number, newStatus: string) {
-  const { sessionClaims } = await auth();
+  const { userId, sessionClaims } = await auth();
   if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "order.status_update" });
     redirect("/");
   }
 
@@ -24,6 +26,7 @@ export async function updateOrderStatus(orderId: number, newStatus: string) {
     .set({ status: newStatus as (typeof VALID_STATUSES)[number] })
     .where(eq(orders.id, orderId));
 
+  auditLog({ userId: userId!, action: "order.status_update", target: String(orderId), details: { newStatus } });
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin/orders");
   return { success: true };

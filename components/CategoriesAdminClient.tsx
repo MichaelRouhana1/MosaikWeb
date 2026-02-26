@@ -190,8 +190,8 @@ export function CategoriesAdminClient({ categories: initialCategories }: Categor
         </form>
       )}
 
-      <div className="border border-border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="border border-border rounded-lg overflow-x-auto">
+        <table className="w-full text-sm min-w-[500px]">
           <thead className="bg-muted">
             <tr>
               <th className="text-left p-4 font-medium">Image</th>

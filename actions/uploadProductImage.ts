@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { validateUploadFile } from "@/lib/security";
 
 const BUCKET = "products";
 
@@ -18,8 +19,9 @@ export async function uploadProductImage(
     return { error: "No file provided" };
   }
 
-  const ext = file.name.split(".").pop() || "jpg";
-  const path = `product-images/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const validation = validateUploadFile(file, "image");
+  if (!validation.ok) return { error: validation.error };
+  const path = `product-images/${Date.now()}-${Math.random().toString(36).slice(2)}.${validation.ext}`;
 
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);

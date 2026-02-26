@@ -8,6 +8,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useCart } from "@/context/CartContext";
 import { toggleWishlist } from "@/actions/toggleWishlist";
 import { ProductCard } from "@/components/ProductCard";
+import { getProductDisplayPrice, isProductOnSale } from "@/lib/utils";
 import type { Product, ProductVariant, ProductColor } from "@/db/schema";
 
 const DEFAULT_SIZES = ["XS", "S", "M", "L", "XL"];
@@ -82,10 +83,8 @@ export function ProductDetailClient({
     [router, searchParams]
   );
   const price = typeof product.price === "string" ? product.price : String(product.price);
-  const salePrice = product.salePrice
-    ? (typeof product.salePrice === "string" ? product.salePrice : String(product.salePrice))
-    : null;
-  const displayPrice = salePrice ?? price;
+  const displayPrice = getProductDisplayPrice(product);
+  const onSale = isProductOnSale(product);
 
   const variantsForColor =
     selectedColor?.id != null
@@ -335,8 +334,8 @@ export function ProductDetailClient({
               </button>
 
               <div className="flex items-center gap-4 w-full max-w-[95vw] max-h-[90vh] px-4">
-                {/* Vertical thumbnail strip */}
-                <div className="flex flex-col gap-2 overflow-y-auto max-h-[90vh] py-2 shrink-0 scrollbar-hide w-16">
+                {/* Vertical thumbnail strip -- hidden on mobile */}
+                <div className="hidden md:flex flex-col gap-2 overflow-y-auto max-h-[90vh] py-2 shrink-0 scrollbar-hide w-16">
                   {imageUrls.map((url, idx) => {
                     const isSelected = lightboxIndex === idx;
                     const hasError = imageErrors[idx];
@@ -586,13 +585,13 @@ export function ProductDetailClient({
           )}
 
           <p className="mt-6 text-lg font-normal text-foreground">
-            {salePrice ? (
+            {onSale ? (
               <>
                 <span className="line-through text-muted-foreground">${price}</span>{" "}
-                <span className="text-destructive font-medium">${salePrice}</span>
+                <span className="text-destructive font-medium">${displayPrice}</span>
               </>
             ) : (
-              `$${price}`
+              `$${displayPrice}`
             )}
           </p>
 

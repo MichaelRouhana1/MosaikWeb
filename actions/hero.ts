@@ -6,6 +6,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { heroImages } from "@/db/schema";
 import { uploadHeroImage } from "@/lib/uploadImages";
+import { auditLog } from "@/lib/audit";
 
 export async function getHeroImages() {
   return db
@@ -17,8 +18,11 @@ export async function getHeroImages() {
 
 /** Fetches all hero images for admin (including inactive). */
 export async function getAllHeroImages() {
-  const { sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "hero.list" });
+    redirect("/");
+  }
   return db
     .select()
     .from(heroImages)
@@ -26,6 +30,11 @@ export async function getAllHeroImages() {
 }
 
 export async function addHeroImage(imageUrl: string, altText?: string) {
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "hero.add" });
+    redirect("/");
+  }
   const [image] = await db
     .insert(heroImages)
     .values({
@@ -33,13 +42,18 @@ export async function addHeroImage(imageUrl: string, altText?: string) {
       altText: altText ?? null,
     })
     .returning();
+  if (image) auditLog({ userId: userId!, action: "hero.add", target: String(image.id) });
   return image;
 }
 
 export async function deleteHeroImage(id: number) {
-  const { sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") redirect("/");
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "hero.delete" });
+    redirect("/");
+  }
   await db.delete(heroImages).where(eq(heroImages.id, id));
+  auditLog({ userId: userId!, action: "hero.delete", target: String(id) });
 }
 
 /** Uploads a hero image file and adds it to the database. Admin only. */

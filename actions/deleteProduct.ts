@@ -5,12 +5,15 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { products } from "@/db/schema";
+import { auditLog } from "@/lib/audit";
 
 export async function deleteProduct(productId: number): Promise<void> {
   const { userId, sessionClaims } = await auth();
   if (!userId || sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "product.delete" });
     redirect("/");
   }
 
   await db.delete(products).where(eq(products.id, productId));
+  auditLog({ userId, action: "product.delete", target: String(productId) });
 }

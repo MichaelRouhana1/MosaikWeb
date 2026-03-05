@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { eq, desc, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { products, productColors } from "@/db/schema";
+import { products, productColors, productCategories } from "@/db/schema";
 import { getHeroImages } from "@/actions/hero";
 import { getHomeVideo } from "@/actions/video";
 import { getLookbookItems, getLookbookSectionVisible } from "@/actions/lookbook";
@@ -16,29 +16,38 @@ const PEXELS = (id: number, w = 800, h = 1000) =>
   `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${w}&h=${h}&fit=crop`;
 
 export default async function HomePage() {
-  const [productList, heroImages, homeVideo, lookbookItems, lookbookSectionVisible, homeCategories] =
+  const [productList, heroImages, homeVideo, lookbookItems, lookbookSectionVisible, homeCategories, allCats] =
     await Promise.all([
-    db
-      .select()
-      .from(products)
-      .where(eq(products.isVisible, true))
-      .orderBy(desc(products.id))
-      .limit(8),
-    getHeroImages(),
-    getHomeVideo(),
-    getLookbookItems(),
-    getLookbookSectionVisible(),
-    getCategoriesForHome(),
-  ]);
+      db
+        .select()
+        .from(products)
+        .where(eq(products.isVisible, true))
+        .orderBy(desc(products.id))
+        .limit(8),
+      getHeroImages(),
+      getHomeVideo(),
+      getLookbookItems(),
+      getLookbookSectionVisible(),
+      getCategoriesForHome(),
+      db.select().from(productCategories),
+    ]);
 
   const productIds = productList.map((p) => p.id);
   const colorsList =
     productIds.length > 0
       ? await db
-          .select()
-          .from(productColors)
-          .where(inArray(productColors.productId, productIds))
+        .select()
+        .from(productColors)
+        .where(inArray(productColors.productId, productIds))
       : [];
+
+  const getStoreType = (categorySlug: string | null) => {
+    let current = allCats.find((c) => c.slug === categorySlug);
+    while (current && current.level !== "root" && current.parentId) {
+      current = allCats.find((c) => c.id === current?.parentId);
+    }
+    return current?.slug || "streetwear";
+  };
   const firstImageByProductId: Record<number, string> = {};
   for (const c of colorsList) {
     if (!firstImageByProductId[c.productId] && c.imageUrls?.[0]) {
@@ -72,12 +81,20 @@ export default async function HomePage() {
             <p className="text-sm font-light text-foreground/90">
               Modern silhouettes. Thoughtful materials. Built to last.
             </p>
-            <Link
-              href="/shop"
-              className="inline-block mt-8 text-sm font-normal text-foreground border-b border-foreground pb-1 hover:opacity-60 transition-opacity duration-200"
-            >
-              Explore the collection
-            </Link>
+            <div className="flex justify-center gap-6 mt-8 relative z-20">
+              <Link
+                href="/streetwear/shop"
+                className="inline-block text-sm font-normal text-foreground border-b border-foreground pb-1 hover:opacity-60 transition-opacity duration-200"
+              >
+                Shop Streetwear
+              </Link>
+              <Link
+                href="/formal/shop"
+                className="inline-block text-sm font-normal text-foreground border-b border-foreground pb-1 hover:opacity-60 transition-opacity duration-200"
+              >
+                Shop Formal
+              </Link>
+            </div>
           </div>
         </section>
       )}
@@ -122,27 +139,27 @@ export default async function HomePage() {
 
       {/* Lookbook */}
       {lookbookSectionVisible && (
-      <section className="py-24 px-6">
-        <h2 className="text-sm font-medium text-foreground tracking-[0.2em] uppercase mb-12 text-center">
-          Get the Look
-        </h2>
-        <div className="max-w-[1400px] mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
-          {lookbookItems.map((item) => (
-            <Link key={item.id} href={item.href} className="group">
-              <div className="aspect-[3/4] overflow-hidden mb-4 relative">
-                <Image
-                  src={item.imageUrl}
-                  alt={item.label}
-                  fill
-                  className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
-                  unoptimized={item.imageUrl.startsWith("https://")}
-                />
-              </div>
-              <p className="text-sm font-normal text-foreground">{item.label}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+        <section className="py-24 px-6">
+          <h2 className="text-sm font-medium text-foreground tracking-[0.2em] uppercase mb-12 text-center">
+            Get the Look
+          </h2>
+          <div className="max-w-[1400px] mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
+            {lookbookItems.map((item) => (
+              <Link key={item.id} href={item.href} className="group">
+                <div className="aspect-[3/4] overflow-hidden mb-4 relative">
+                  <Image
+                    src={item.imageUrl}
+                    alt={item.label}
+                    fill
+                    className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
+                    unoptimized={item.imageUrl.startsWith("https://")}
+                  />
+                </div>
+                <p className="text-sm font-normal text-foreground">{item.label}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Product Discovery */}
@@ -158,10 +175,11 @@ export default async function HomePage() {
               const displayPrice = getProductDisplayPrice(product);
               const onSale = isProductOnSale(product);
               const percentOff = getProductDiscountPercent(product);
+              const storeType = getStoreType(product.categorySlug);
               return (
                 <Link
                   key={product.id}
-                  href={`/shop/${product.id}`}
+                  href={`/${storeType}/product/${product.id}`}
                   className="flex-shrink-0 w-[220px] group"
                 >
                   <div className="aspect-[2/3] overflow-hidden mb-4 relative">

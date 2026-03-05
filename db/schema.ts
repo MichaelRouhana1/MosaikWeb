@@ -19,6 +19,12 @@ export const productCategoryEnum = pgEnum("product_category", [
   "OTHER",
 ]);
 
+export const categoryLevelEnum = pgEnum("category_level", [
+  "root",
+  "main",
+  "sub",
+]);
+
 export const orderStatusEnum = pgEnum("order_status", [
   "PENDING",
   "PROCESSING",
@@ -34,6 +40,8 @@ export const promoDiscountTypeEnum = pgEnum("promo_discount_type", [
 ]);
 
 // Product categories - admin-managed, slug used for shop filtering
+import { AnyPgColumn } from "drizzle-orm/pg-core";
+
 export const productCategories = pgTable("product_categories", {
   id: serial("id").primaryKey(),
   slug: text("slug").notNull().unique(),
@@ -41,6 +49,8 @@ export const productCategories = pgTable("product_categories", {
   image: text("image"),
   showOnHome: boolean("show_on_home").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
+  parentId: integer("parent_id").references((): AnyPgColumn => productCategories.id),
+  level: categoryLevelEnum("level").notNull().default("main"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -135,7 +145,21 @@ export const orderItems = pgTable("order_items", {
 });
 
 // Relations
-export const productsRelations = relations(products, ({ many }) => ({
+export const productCategoriesRelations = relations(productCategories, ({ one, many }) => ({
+  parent: one(productCategories, {
+    fields: [productCategories.parentId],
+    references: [productCategories.id],
+    relationName: "parent_to_child",
+  }),
+  children: many(productCategories, { relationName: "parent_to_child" }),
+  products: many(products),
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
+  productCategory: one(productCategories, {
+    fields: [products.categorySlug],
+    references: [productCategories.slug],
+  }),
   variants: many(productVariants),
   colors: many(productColors),
   orderItems: many(orderItems),

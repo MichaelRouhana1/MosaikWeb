@@ -8,7 +8,7 @@ import { useTheme } from "next-themes";
 import { useCart } from "@/context/CartContext";
 import { CartDrawer } from "@/components/CartDrawer";
 import { ShopDrawer } from "@/components/ShopDrawer";
-import { getCategories } from "@/actions/categories";
+import { getCategories, getStoreCategories } from "@/actions/categories";
 import type { ProductCategory } from "@/actions/categories";
 
 export function Navbar() {
@@ -30,8 +30,13 @@ export function Navbar() {
   }, [setOpenCart]);
 
   useEffect(() => {
-    getCategories().then(setCategories);
-  }, []);
+    const storeType = pathname?.split('/')[1];
+    if (storeType === "streetwear" || storeType === "formal") {
+      getStoreCategories(storeType).then(setCategories);
+    } else {
+      getCategories().then(setCategories);
+    }
+  }, [pathname]);
 
   const isAdmin = (sessionClaims?.metadata as { role?: string })?.role === "admin";
 

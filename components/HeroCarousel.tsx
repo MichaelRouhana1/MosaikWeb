@@ -60,12 +60,20 @@ export function HeroCarousel({ images }: HeroCarouselProps) {
             <p className="text-sm font-light text-foreground/90">
               Modern silhouettes. Thoughtful materials. Built to last.
             </p>
-            <Link
-              href="/shop"
-              className="inline-block mt-8 text-sm font-normal text-foreground border-b border-foreground pb-1 hover:opacity-60 transition-opacity duration-200"
-            >
-              Explore the collection
-            </Link>
+            <div className="flex justify-center gap-6 mt-8 relative z-20">
+              <Link
+                href="/streetwear/shop"
+                className="inline-block text-sm font-normal text-foreground border-b border-foreground pb-1 hover:opacity-60 transition-opacity duration-200"
+              >
+                Shop Streetwear
+              </Link>
+              <Link
+                href="/formal/shop"
+                className="inline-block text-sm font-normal text-foreground border-b border-foreground pb-1 hover:opacity-60 transition-opacity duration-200"
+              >
+                Shop Formal
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -110,9 +118,8 @@ export function HeroCarousel({ images }: HeroCarouselProps) {
                   key={i}
                   type="button"
                   onClick={() => goTo(i)}
-                  className={`w-2 h-2 transition-colors ${
-                    i === currentIndex ? "bg-foreground" : "bg-foreground/40 hover:bg-foreground/60"
-                  }`}
+                  className={`w-2 h-2 transition-colors ${i === currentIndex ? "bg-foreground" : "bg-foreground/40 hover:bg-foreground/60"
+                    }`}
                   aria-label={`Go to slide ${i + 1}`}
                 />
               ))}

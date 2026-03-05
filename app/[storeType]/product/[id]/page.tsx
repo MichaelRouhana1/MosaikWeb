@@ -9,9 +9,9 @@ import { ProductDetailClient } from "@/components/ProductDetailClient";
 export default async function ProductPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; storeType: string }>;
 }) {
-  const { id } = await params;
+  const { id, storeType } = await params;
   const productId = parseInt(id, 10);
   if (isNaN(productId)) notFound();
 
@@ -48,9 +48,9 @@ export default async function ProductPage({
   const [similarVariants, similarColors] =
     similarProductIds.length > 0
       ? await Promise.all([
-          db.select().from(productVariants).where(inArray(productVariants.productId, similarProductIds)),
-          db.select().from(productColors).where(inArray(productColors.productId, similarProductIds)),
-        ])
+        db.select().from(productVariants).where(inArray(productVariants.productId, similarProductIds)),
+        db.select().from(productColors).where(inArray(productColors.productId, similarProductIds)),
+      ])
       : [[], []];
 
   const similarFirstImageByProductId: Record<number, string> = {};
@@ -86,12 +86,17 @@ export default async function ProductPage({
 
   return (
     <div className="pt-14">
-      <Link
-        href="/shop"
-        className="text-sm text-muted-foreground hover:text-foreground mb-6 inline-block px-6"
-      >
-        ← Back to shop
-      </Link>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6 px-6">
+        <Link href="/" className="hover:text-foreground">Home</Link>
+        <span>/</span>
+        <Link href={`/${storeType}/shop`} className="hover:text-foreground capitalize">{storeType}</Link>
+        {product.categorySlug && (
+          <>
+            <span>/</span>
+            <span className="text-foreground capitalize">{product.categorySlug.replace(/-/g, ' ')}</span>
+          </>
+        )}
+      </div>
       <ProductDetailClient
         product={productWithImages}
         variants={variants}

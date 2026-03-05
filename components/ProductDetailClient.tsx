@@ -7,6 +7,13 @@ import { useAuth } from "@clerk/nextjs";
 import { useCart } from "@/context/CartContext";
 import { toggleWishlist } from "@/actions/toggleWishlist";
 import { ProductCard } from "@/components/ProductCard";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselDots,
+  type CarouselApi,
+} from "@/components/ui/carousel";
 import { getProductDisplayPrice, isProductOnSale } from "@/lib/utils";
 import type { Product, ProductVariant, ProductColor } from "@/db/schema";
 
@@ -46,6 +53,7 @@ export function ProductDetailClient({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxZoomed, setLightboxZoomed] = useState(false);
+  const [carouselApi, setCarouselApi] = useState<CarouselApi | undefined>(undefined);
   const lightboxScrollRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
 
@@ -69,6 +77,11 @@ export function ProductDetailClient({
   useEffect(() => {
     setDisplayOrder(imageUrls.map((_, i) => i));
   }, [product.id, imageUrls.length, selectedColor?.id]);
+
+  useEffect(() => {
+    carouselApi?.scrollTo(0);
+  }, [selectedColor?.id, imageUrls.length, carouselApi]);
+
   const hasMultipleImages = imageUrls.length >= 2;
 
   const handleColorSelect = useCallback(
@@ -239,6 +252,72 @@ export function ProductDetailClient({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         {/* Image gallery */}
         <div className="flex flex-col gap-4">
+          {/* Mobile: peek carousel with dots */}
+          <div className="md:hidden w-full relative">
+            <button
+              type="button"
+              onClick={handleWishlistClick}
+              className="absolute top-4 right-4 w-10 h-10 z-10 flex items-center justify-center bg-white/90 dark:bg-black/60 text-foreground hover:bg-white dark:hover:bg-black/80 transition-colors rounded-none"
+              aria-label={wishlistState ? "Remove from favorites" : "Add to favorites"}
+            >
+              {wishlistState ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+              )}
+            </button>
+            <Carousel
+              setApi={setCarouselApi}
+              opts={{ align: "start", containScroll: "trimSnaps", loop: imageUrls.length > 1 }}
+              className="w-full"
+            >
+              <CarouselContent className="flex gap-0">
+                {imageUrls.map((url, idx) => {
+                  const hasError = imageErrors[idx];
+                  const src = !hasError && url ? url : null;
+                  return (
+                    <CarouselItem key={idx} className="basis-[80%] min-w-0 shrink-0 grow-0 pl-2 first:pl-0">
+                      <div
+                        className="relative aspect-[2/3] overflow-hidden bg-muted rounded-sm cursor-pointer transition-transform duration-200 hover:scale-[1.02] active:scale-[0.99]"
+                        onClick={() => {
+                          setLightboxIndex(idx);
+                          openLightbox();
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === "Enter" && (setLightboxIndex(idx), openLightbox())}
+                        aria-label="View full image"
+                      >
+                        {src ? (
+                          <Image
+                            src={src}
+                            alt={product.name}
+                            fill
+                            className="object-cover"
+                            onError={() => handleImageError(idx)}
+                            unoptimized={!url.startsWith(PEXELS_PREFIX)}
+                            sizes="(max-width: 768px) 80vw, 50vw"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-muted-foreground text-sm">
+                            No image
+                          </div>
+                        )}
+                      </div>
+                    </CarouselItem>
+                  );
+                })}
+              </CarouselContent>
+              <CarouselDots />
+            </Carousel>
+          </div>
+
+          {/* Desktop: main image + arrows */}
+          <div className="hidden md:block">
           <div
             className="relative aspect-[2/3] overflow-hidden bg-muted group cursor-pointer"
             onClick={openLightbox}
@@ -485,9 +564,9 @@ export function ProductDetailClient({
             </div>
           )}
 
-          {/* Thumbnail grid - swaps with main on click */}
+          {/* Thumbnail grid - desktop only, swaps with main on click */}
           {hasMultipleImages && displayOrder.length > 1 && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 mt-4">
               {displayOrder.slice(1).map((urlIndex, i) => {
                 const position = i + 1;
                 const hasError = imageErrors[urlIndex];
@@ -519,6 +598,7 @@ export function ProductDetailClient({
               })}
             </div>
           )}
+          </div>
         </div>
 
         {/* Product info */}

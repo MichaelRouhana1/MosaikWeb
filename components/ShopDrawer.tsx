@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ProductCategory } from "@/actions/categories";
 
 interface ShopDrawerProps {
@@ -13,6 +14,10 @@ interface ShopDrawerProps {
 
 export function ShopDrawer({ isOpen, onClose, categories }: ShopDrawerProps) {
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname();
+  const storeTypeMatch = pathname?.match(/^\/(streetwear|formal)/);
+  const storeType = storeTypeMatch ? storeTypeMatch[1] : null;
+  const baseUrl = storeType ? `/${storeType}/shop` : "/shop";
 
   useEffect(() => {
     setMounted(true);
@@ -36,17 +41,15 @@ export function ShopDrawer({ isOpen, onClose, categories }: ShopDrawerProps) {
         tabIndex={0}
         onClick={onClose}
         onKeyDown={(e) => e.key === "Escape" && onClose()}
-        className={`fixed inset-0 bg-black/60 z-[9998] transition-opacity duration-300 ${
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
+        className={`fixed inset-0 bg-black/60 z-[9998] transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
         aria-hidden={!isOpen}
       />
 
       {/* Drawer - slides in from the left */}
       <aside
-        className={`fixed top-0 left-0 h-full w-[min(100vw,28rem)] min-w-[320px] flex flex-col bg-card text-card-foreground shadow-2xl z-[9999] transition-transform duration-300 ease-out ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed top-0 left-0 h-full w-[min(100vw,28rem)] min-w-[320px] flex flex-col bg-card text-card-foreground shadow-2xl z-[9999] transition-transform duration-300 ease-out ${isOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
         style={{ boxShadow: "4px 0 24px rgba(0,0,0,0.15)" }}
       >
         <div className="flex items-center justify-between p-6 border-b border-border">
@@ -76,7 +79,7 @@ export function ShopDrawer({ isOpen, onClose, categories }: ShopDrawerProps) {
         <div className="flex-1 overflow-y-auto p-6">
           <nav className="space-y-1" role="navigation" aria-label="Shop categories">
             <Link
-              href="/shop"
+              href={baseUrl}
               onClick={onClose}
               className="block px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50 rounded-none"
             >
@@ -85,7 +88,7 @@ export function ShopDrawer({ isOpen, onClose, categories }: ShopDrawerProps) {
             {categories.map((cat) => (
               <Link
                 key={cat.id}
-                href={`/shop?category=CLOTHING&cat=${cat.slug}`}
+                href={`${baseUrl}?cat=${cat.slug}`}
                 onClick={onClose}
                 className="block px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50 rounded-none"
               >

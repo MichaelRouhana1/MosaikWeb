@@ -3,23 +3,41 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { products, productVariants, productColors, wishlists } from "@/db/schema";
 import { ShopClient } from "@/components/ShopClient";
-import { getValidCategorySlugs, getCategories } from "@/actions/categories";
+import { getValidCategorySlugs, getCategories, getStoreCategorySlugs, getStoreCategories } from "@/actions/categories";
 import { Suspense } from "react";
+import { notFound } from "next/navigation";
 
 interface ShopPageProps {
+  params: Promise<{ storeType: string }>;
   searchParams: Promise<{ category?: string; cat?: string; sort?: string }>;
 }
 
-export default async function ShopPage({ searchParams }: ShopPageProps) {
-  const params = await searchParams;
-  const cat = params.cat;
+export default async function ShopPage({ params, searchParams }: ShopPageProps) {
+  const { storeType } = await params;
+  const search = await searchParams;
+  const cat = search.cat;
 
   const validSlugs = await getValidCategorySlugs();
-  const catFilter = cat && validSlugs.includes(cat);
+  const storeSlugs = await getStoreCategorySlugs(storeType);
 
-  const whereClause = catFilter
-    ? and(eq(products.isVisible, true), eq(products.categorySlug, cat))
-    : eq(products.isVisible, true);
+  if (storeSlugs.length === 0 && (storeType === "streetwear" || storeType === "formal")) {
+    // Wait, if no categories seeded yet, let's at least allow the page to load, but we filter if seeded.
+    // Also valid route check
+  } else if (storeType !== "streetwear" && storeType !== "formal") {
+    notFound();
+  }
+
+  const catFilter = cat && validSlugs.includes(cat) && storeSlugs.includes(cat);
+
+  const baseFilters = [eq(products.isVisible, true)];
+  if (storeSlugs.length > 0) {
+    baseFilters.push(inArray(products.categorySlug, storeSlugs));
+  }
+  if (catFilter && cat) {
+    baseFilters.push(eq(products.categorySlug, cat));
+  }
+
+  const whereClause = and(...baseFilters);
 
   const productList = await db
     .select()
@@ -30,9 +48,9 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
   const [variantsList, colorsList] =
     productIds.length > 0
       ? await Promise.all([
-          db.select().from(productVariants).where(inArray(productVariants.productId, productIds)),
-          db.select().from(productColors).where(inArray(productColors.productId, productIds)),
-        ])
+        db.select().from(productVariants).where(inArray(productVariants.productId, productIds)),
+        db.select().from(productColors).where(inArray(productColors.productId, productIds)),
+      ])
       : [[], []];
 
   const colorsByProductId = colorsList.reduce<Record<number, typeof productColors.$inferSelect[]>>(
@@ -65,7 +83,8 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
   );
 
   const categories = await getCategories();
-  const categoryLabel = catFilter && cat ? categories.find((c) => c.slug === cat)?.label ?? null : null;
+  const storeCategories = await getStoreCategories(storeType);
+  const categoryLabel = catFilter && cat ? storeCategories.find((c) => c.slug === cat)?.label ?? null : null;
 
   let wishlistProductIds: number[] = [];
   const { userId } = await auth();
@@ -92,6 +111,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
           colorsByProductId={colorsByProductId}
           wishlistProductIds={wishlistProductIds}
           categoryLabel={categoryLabel}
+          storeCategories={storeCategories}
         />
       </Suspense>
     </div>

@@ -16,11 +16,48 @@ export async function getValidCategorySlugs(): Promise<string[]> {
   return cats.map((c) => c.slug);
 }
 
+/** Get all category slugs descending from a specific root storeType */
+export async function getStoreCategorySlugs(storeType: string): Promise<string[]> {
+  const allCats = await db.select().from(productCategories);
+  const root = allCats.find(c => c.slug === storeType && c.level === "root");
+  if (!root) return [];
+
+  const slugs = new Set<string>([root.slug]);
+
+  function addSlugs(parentId: number) {
+    const children = allCats.filter(c => c.parentId === parentId);
+    for (const child of children) {
+      slugs.add(child.slug);
+      addSlugs(child.id);
+    }
+  }
+
+  addSlugs(root.id);
+  return Array.from(slugs);
+}
+
+/** Get only the category definitions for a specific store type */
+export async function getStoreCategories(storeType: string): Promise<ProductCategory[]> {
+  const storeSlugs = await getStoreCategorySlugs(storeType);
+  if (storeSlugs.length === 0) return [];
+  const allCats = await db.select().from(productCategories).orderBy(asc(productCategories.sortOrder), asc(productCategories.id));
+  return allCats.filter(c => storeSlugs.includes(c.slug) && c.level !== "root");
+}
+
 /** All categories for burger menu, shop, etc. */
 export async function getCategories(): Promise<ProductCategory[]> {
   return db
     .select()
     .from(productCategories)
+    .orderBy(asc(productCategories.sortOrder), asc(productCategories.id));
+}
+
+/** Fetch subcategories for a given parent */
+export async function getSubcategories(parentId: number): Promise<ProductCategory[]> {
+  return db
+    .select()
+    .from(productCategories)
+    .where(eq(productCategories.parentId, parentId))
     .orderBy(asc(productCategories.sortOrder), asc(productCategories.id));
 }
 
@@ -56,6 +93,9 @@ export async function createCategory(formData: FormData): Promise<{ error?: stri
   const label = (formData.get("label") as string)?.trim();
   const showOnHome = formData.get("showOnHome") === "true";
   const imageFile = formData.get("image") as File | null;
+  const parentIdStr = formData.get("parentId") as string | null;
+  const parentId = parentIdStr ? parseInt(parentIdStr, 10) : null;
+  const level = (formData.get("level") as "root" | "main" | "sub") || "main";
 
   if (!slug) return { error: "Slug is required" };
   if (!label) return { error: "Label is required" };
@@ -88,6 +128,8 @@ export async function createCategory(formData: FormData): Promise<{ error?: stri
     image: imageUrl,
     showOnHome,
     sortOrder: nextSortOrder,
+    parentId,
+    level,
   });
   auditLog({ userId: userId!, action: "category.create", target: slug, details: { label } });
   return {};
@@ -108,6 +150,9 @@ export async function updateCategory(
   const label = (formData.get("label") as string)?.trim();
   const showOnHome = formData.get("showOnHome") === "true";
   const imageFile = formData.get("image") as File | null;
+  const parentIdStr = formData.get("parentId") as string | null;
+  const parentId = parentIdStr ? parseInt(parentIdStr, 10) : null;
+  const level = (formData.get("level") as "root" | "main" | "sub") || "main";
 
   if (!slug) return { error: "Slug is required" };
   if (!label) return { error: "Label is required" };
@@ -135,7 +180,7 @@ export async function updateCategory(
 
   await db
     .update(productCategories)
-    .set({ slug, label, image: imageUrl, showOnHome })
+    .set({ slug, label, image: imageUrl, showOnHome, parentId, level })
     .where(eq(productCategories.id, id));
   auditLog({ userId: userId!, action: "category.update", target: String(id), details: { slug, label } });
   return {};

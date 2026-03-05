@@ -7,6 +7,7 @@ import { CategoryHeader } from "@/components/CategoryHeader";
 import { UtilityBar, type SortOption } from "@/components/UtilityBar";
 import { FilterPanel, type FilterState } from "@/components/FilterPanel";
 import type { Product, ProductVariant, ProductColor } from "@/db/schema";
+import type { ProductCategory } from "@/actions/categories";
 
 const PRODUCTS_PER_PAGE = 12;
 const VALID_LEGACY_CATEGORIES = ["CLOTHING", "SHOES", "ACCESSORIES", "BAGS", "OTHER"] as const;
@@ -17,6 +18,7 @@ interface ShopClientProps {
   colorsByProductId?: Record<number, ProductColor[]>;
   wishlistProductIds: number[];
   categoryLabel?: string | null;
+  storeCategories?: ProductCategory[];
 }
 
 export function ShopClient({
@@ -25,6 +27,7 @@ export function ShopClient({
   colorsByProductId = {},
   wishlistProductIds,
   categoryLabel,
+  storeCategories,
 }: ShopClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -45,6 +48,7 @@ export function ShopClient({
     priceMax: 500,
     size: [],
     color: [],
+    subcategory: [],
   });
   const [visibleCount, setVisibleCount] = useState(PRODUCTS_PER_PAGE);
   const priceInitialized = useRef(false);
@@ -98,6 +102,10 @@ export function ShopClient({
       const price = parseFloat(String(p.price));
       return price >= priceMin && price <= priceMax;
     });
+
+    if (filters.subcategory.length > 0) {
+      list = list.filter((p) => filters.subcategory.includes(p.categorySlug || ""));
+    }
 
     if (filters.size.length > 0) {
       list = list.filter((p) => {
@@ -162,6 +170,7 @@ export function ShopClient({
         filters={filters}
         onFiltersChange={setFilters}
         priceBounds={priceBounds}
+        subcategories={storeCategories?.map(c => ({ value: c.slug, label: c.label }))}
       />
       <main className="w-full px-6 py-8">
         {filteredAndSorted.length === 0 ? (

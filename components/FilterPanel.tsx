@@ -7,6 +7,7 @@ export interface FilterState {
   priceMax: number;
   size: string[];
   color: string[];
+  subcategory: string[];
 }
 
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL"];
@@ -28,6 +29,7 @@ interface FilterPanelProps {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
   priceBounds: { min: number; max: number };
+  subcategories?: { value: string; label: string }[];
 }
 
 function FilterSection({
@@ -37,7 +39,7 @@ function FilterSection({
   onToggle,
 }: {
   title: string;
-  options: string[];
+  options: { value: string; label: string }[] | string[];
   selected: string[];
   onToggle: (value: string) => void;
 }) {
@@ -47,20 +49,23 @@ function FilterSection({
         {title}
       </h3>
       <div className="flex flex-wrap gap-2">
-        {options.map((opt) => (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => onToggle(opt)}
-            className={`rounded-none px-4 py-2 text-xs font-normal uppercase tracking-[0.15em] transition-colors ${
-              selected.includes(opt)
-                ? "bg-foreground text-background dark:bg-background dark:text-foreground"
-                : "bg-muted text-foreground hover:bg-muted/80"
-            }`}
-          >
-            {opt}
-          </button>
-        ))}
+        {options.map((opt) => {
+          const value = typeof opt === "string" ? opt : opt.value;
+          const label = typeof opt === "string" ? opt : opt.label;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onToggle(value)}
+              className={`rounded-none px-4 py-2 text-xs font-normal uppercase tracking-[0.15em] transition-colors ${selected.includes(value)
+                  ? "bg-foreground text-background dark:bg-background dark:text-foreground"
+                  : "bg-muted text-foreground hover:bg-muted/80"
+                }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -133,6 +138,7 @@ export function FilterPanel({
   filters,
   onFiltersChange,
   priceBounds,
+  subcategories,
 }: FilterPanelProps) {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -148,10 +154,10 @@ export function FilterPanel({
     };
   }, [isOpen, onClose]);
 
-  const toggleFilter = (key: "size" | "color") => (value: string) => {
+  const toggleFilter = (key: "size" | "color" | "subcategory") => (value: string) => {
     const current = filters[key];
     const next = current.includes(value)
-      ? current.filter((v) => v !== value)
+      ? current.filter((v: string) => v !== value)
       : [...current, value];
     onFiltersChange({ ...filters, [key]: next });
   };
@@ -163,16 +169,14 @@ export function FilterPanel({
   return (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-200 ${
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
+        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-200 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
         onClick={onClose}
         aria-hidden
       />
       <aside
-        className={`fixed left-0 top-0 bottom-0 w-[320px] max-w-[85vw] z-50 bg-background shadow-xl overflow-y-auto transition-transform duration-200 ease-out ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed left-0 top-0 bottom-0 w-[320px] max-w-[85vw] z-50 bg-background shadow-xl overflow-y-auto transition-transform duration-200 ease-out ${isOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
         role="dialog"
         aria-label="Filters"
       >
@@ -206,6 +210,14 @@ export function FilterPanel({
             valueMax={filters.priceMax}
             onChange={setPriceRange}
           />
+          {subcategories && subcategories.length > 0 && (
+            <FilterSection
+              title="Category"
+              options={subcategories}
+              selected={filters.subcategory}
+              onToggle={toggleFilter("subcategory")}
+            />
+          )}
           <FilterSection
             title="Size"
             options={SIZE_OPTIONS}

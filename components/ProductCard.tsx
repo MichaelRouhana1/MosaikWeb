@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { toggleWishlist } from "@/actions/toggleWishlist";
 import { useCart } from "@/context/CartContext";
@@ -30,8 +30,13 @@ export function ProductCard({
   compact = false,
 }: ProductCardProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { isSignedIn } = useAuth();
   const { addToCart, openCart } = useCart();
+
+  const storeTypeMatch = pathname?.match(/^\/(streetwear|formal)/);
+  const storeType = storeTypeMatch ? storeTypeMatch[1] : null;
+  const productUrl = storeType ? `/${storeType}/product/${product.id}` : `/shop/${product.id}`;
   const [wishlistState, setWishlistState] = useState(inWishlist);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedColorIndex, setSelectedColorIndex] = useState(0);
@@ -61,8 +66,8 @@ export function ProductCard({
   const sizes =
     variantsForColor.length > 0
       ? [...new Set(variantsForColor.map((v) => v.size))].sort(
-          (a, b) => DEFAULT_SIZES.indexOf(a) - DEFAULT_SIZES.indexOf(b)
-        )
+        (a, b) => DEFAULT_SIZES.indexOf(a) - DEFAULT_SIZES.indexOf(b)
+      )
       : DEFAULT_SIZES;
 
   const handleWishlistClick = async (e: React.MouseEvent) => {
@@ -125,11 +130,10 @@ export function ProductCard({
     <article
       className={`group overflow-hidden ${compact ? "text-[0.85em]" : ""}`}
     >
-      <Link href={`/shop/${product.id}`} className="block">
+      <Link href={productUrl} className="block">
         <div
-          className={`relative aspect-[2/3] overflow-hidden bg-muted ${
-            compact ? "" : ""
-          }`}
+          className={`relative aspect-[2/3] overflow-hidden bg-muted ${compact ? "" : ""
+            }`}
         >
           {onSale && percentOff > 0 && (
             <span className="absolute top-2 left-2 z-10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider bg-destructive text-destructive-foreground">
@@ -141,9 +145,8 @@ export function ProductCard({
               src={currentImage}
               alt={product.name}
               fill
-              className={`object-cover transition-opacity duration-200 ${
-                isOutOfStock ? "opacity-70" : ""
-              }`}
+              className={`object-cover transition-opacity duration-200 ${isOutOfStock ? "opacity-70" : ""
+                }`}
               sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
               unoptimized={!currentImage.startsWith(PEXELS_PREFIX)}
             />
@@ -157,9 +160,8 @@ export function ProductCard({
           <button
             type="button"
             onClick={handleWishlistClick}
-            className={`absolute top-2 right-2 z-10 flex items-center justify-center bg-card/90 dark:bg-card/90 text-foreground hover:opacity-90 transition-colors ${
-              compact ? "w-8 h-8" : "w-10 h-10"
-            }`}
+            className={`absolute top-2 right-2 z-10 flex items-center justify-center bg-card/90 dark:bg-card/90 text-foreground hover:opacity-90 transition-colors ${compact ? "w-8 h-8" : "w-10 h-10"
+              }`}
             aria-label={wishlistState ? "Remove from favorites" : "Add to favorites"}
           >
             {wishlistState ? (
@@ -197,9 +199,8 @@ export function ProductCard({
               <button
                 type="button"
                 onClick={goToPrevImage}
-                className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center bg-card/80 dark:bg-card/80 text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:opacity-100 ${
-                  compact ? "w-8 h-8" : "w-10 h-10"
-                }`}
+                className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center bg-card/80 dark:bg-card/80 text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:opacity-100 ${compact ? "w-8 h-8" : "w-10 h-10"
+                  }`}
                 aria-label="Previous image"
               >
                 <svg
@@ -219,9 +220,8 @@ export function ProductCard({
               <button
                 type="button"
                 onClick={goToNextImage}
-                className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center bg-card/80 dark:bg-card/80 text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:opacity-100 ${
-                  compact ? "w-8 h-8" : "w-10 h-10"
-                }`}
+                className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center bg-card/80 dark:bg-card/80 text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:opacity-100 ${compact ? "w-8 h-8" : "w-10 h-10"
+                  }`}
                 aria-label="Next image"
               >
                 <svg
@@ -244,9 +244,8 @@ export function ProductCard({
           {/* Size selection overlay - theme-aware for dark mode */}
           {!isOutOfStock && (
             <div
-              className={`absolute inset-x-0 bottom-0 bg-card border-t border-border opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${
-                compact ? "p-2" : "p-4"
-              }`}
+              className={`absolute inset-x-0 bottom-0 bg-card border-t border-border opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${compact ? "p-2" : "p-4"
+                }`}
             >
               <p className="text-xs font-medium uppercase tracking-widest text-foreground mb-2">
                 Select size
@@ -260,11 +259,10 @@ export function ProductCard({
                       type="button"
                       onClick={(e) => handleSizeClick(e, size)}
                       disabled={!inStock}
-                      className={`px-3 py-1.5 text-xs font-medium uppercase tracking-widest transition-colors ${
-                        inStock
+                      className={`px-3 py-1.5 text-xs font-medium uppercase tracking-widest transition-colors ${inStock
                           ? "border border-foreground text-foreground hover:bg-foreground hover:text-primary-foreground"
                           : "border border-muted-foreground/40 text-muted-foreground/60 opacity-60 cursor-not-allowed line-through"
-                      }`}
+                        }`}
                     >
                       {size}
                     </button>
@@ -277,9 +275,8 @@ export function ProductCard({
         <div className={`flex items-start justify-between gap-2 ${compact ? "mt-2" : "mt-3"}`}>
           <div className="min-w-0 flex-1">
             <h3
-              className={`font-light text-foreground truncate ${
-                compact ? "text-xs" : "text-sm"
-              }`}
+              className={`font-light text-foreground truncate ${compact ? "text-xs" : "text-sm"
+                }`}
             >
               {product.name}
             </h3>
@@ -310,9 +307,8 @@ export function ProductCard({
                   key={color.id}
                   type="button"
                   onClick={(e) => handleColorClick(e, i)}
-                  className={`relative shrink-0 rounded-full transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-foreground ${
-                    compact ? "w-4 h-4" : "w-5 h-5"
-                  } ${i === selectedColorIndex ? "border border-foreground" : "border-2 border-border"}`}
+                  className={`relative shrink-0 rounded-full transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-foreground ${compact ? "w-4 h-4" : "w-5 h-5"
+                    } ${i === selectedColorIndex ? "border border-foreground" : "border-2 border-border"}`}
                   style={
                     color.hexCode
                       ? { backgroundColor: color.hexCode }

@@ -37,7 +37,12 @@ async function main() {
     WHERE table_name = 'products' AND column_name = 'images'
   `;
 
-  const products = await sql`SELECT id, images, color FROM products`;
+  let products;
+  if (hasImages.length > 0) {
+    products = await sql`SELECT id, images, color FROM products`;
+  } else {
+    products = await sql`SELECT id, color FROM products`;
+  }
   for (const p of products) {
     const images = hasImages.length > 0 && p.images ? (p.images as string[]) : [];
     const name = (p.color as string) || "Default";

@@ -5,6 +5,23 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { products, productVariants, productColors, wishlists } from "@/db/schema";
 import { ProductDetailClient } from "@/components/ProductDetailClient";
+import type { Metadata } from "next";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string; storeType: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const productId = parseInt(id, 10);
+  if (isNaN(productId)) return { title: "MOSAIK | Product Not Found" };
+
+  const [product] = await db
+    .select({ name: products.name })
+    .from(products)
+    .where(eq(products.id, productId))
+    .limit(1);
+
+  return {
+    title: product ? `MOSAIK | ${product.name}` : "MOSAIK | Product",
+  };
+}
 
 export default async function ProductPage({
   params,

@@ -12,6 +12,16 @@ interface ShopPageProps {
   searchParams: Promise<{ category?: string; cat?: string; sort?: string }>;
 }
 
+import type { Metadata } from "next";
+
+export async function generateMetadata({ params }: ShopPageProps): Promise<Metadata> {
+  const { storeType } = await params;
+  const title = storeType === "streetwear" ? "Streetwear Shop" : storeType === "formal" ? "Formal Shop" : "Shop";
+  return {
+    title: `MOSAIK | ${title}`,
+  };
+}
+
 export default async function ShopPage({ params, searchParams }: ShopPageProps) {
   const { storeType } = await params;
   const search = await searchParams;

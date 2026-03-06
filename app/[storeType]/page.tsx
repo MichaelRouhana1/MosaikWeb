@@ -12,6 +12,15 @@ import { notFound } from "next/navigation";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { VideoMuteToggle } from "@/components/VideoMuteToggle";
 import { NewsletterForm } from "@/components/NewsletterForm";
+import type { Metadata } from "next";
+
+export async function generateMetadata({ params }: { params: Promise<{ storeType: string }> }): Promise<Metadata> {
+  const { storeType } = await params;
+  const title = storeType === "streetwear" ? "Streetwear" : storeType === "formal" ? "Formal" : "Shop";
+  return {
+    title: `MOSAIK | ${title}`,
+  };
+}
 
 const PEXELS = (id: number, w = 800, h = 1000) =>
   `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${w}&h=${h}&fit=crop`;

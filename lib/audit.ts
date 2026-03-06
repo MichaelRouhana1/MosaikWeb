@@ -10,6 +10,8 @@ export type AuditAction =
   | "category.create"
   | "category.update"
   | "category.delete"
+  | "category.seed"
+  | "category.seed_roots"
   | "order.status_update"
   | "bulk_discount.apply"
   | "bulk_discount.remove"

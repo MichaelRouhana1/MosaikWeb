@@ -63,6 +63,7 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
     objectUrl: string;
     label: string;
     href: string;
+    storeType: "streetwear" | "formal" | "both";
   } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -92,7 +93,7 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
     if (acceptedFiles.length >= 1) {
       const file = acceptedFiles[0];
       const url = URL.createObjectURL(file);
-      setCropFile({ file, objectUrl: url, label: "", href: "/shop" });
+      setCropFile({ file, objectUrl: url, label: "", href: "/shop", storeType: "both" });
     }
   }, []);
 
@@ -100,7 +101,7 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
     async (blob: Blob) => {
       const current = cropFileRef.current;
       if (!current) return;
-      const { label, href } = current;
+      const { label, href, storeType } = current;
       if (!label.trim()) {
         console.error("Label is required");
         return;
@@ -117,6 +118,7 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
       formData.append("image", file);
       formData.append("label", label.trim());
       formData.append("href", (href || "/shop").trim());
+      formData.append("storeType", storeType);
       const result = await addLookbookItemFromFile(formData);
       setIsAdding(false);
 
@@ -208,7 +210,10 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                 />
               </div>
-              <p className="p-3 text-sm font-normal text-foreground truncate">{item.label}</p>
+              <div className="p-3 text-sm font-normal text-foreground flex flex-col gap-1">
+                <span className="truncate">{item.label}</span>
+                <span className="text-xs uppercase opacity-60">{item.storeType}</span>
+              </div>
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <Button
                   variant="destructive"
@@ -233,6 +238,9 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
           onHrefChange={(href) =>
             setCropFile((prev) => (prev ? { ...prev, href } : null))
           }
+          onStoreTypeChange={(storeType) =>
+            setCropFile((prev) => (prev ? { ...prev, storeType } : null))
+          }
           onComplete={handleCropComplete}
           onCancel={handleCropCancel}
         />
@@ -242,9 +250,10 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
 }
 
 interface LookAddModalProps {
-  cropFile: { file: File; objectUrl: string; label: string; href: string };
+  cropFile: { file: File; objectUrl: string; label: string; href: string; storeType: "streetwear" | "formal" | "both" };
   onLabelChange: (label: string) => void;
   onHrefChange: (href: string) => void;
+  onStoreTypeChange: (storeType: "streetwear" | "formal" | "both") => void;
   onComplete: (blob: Blob) => void;
   onCancel: () => void;
 }
@@ -253,6 +262,7 @@ function LookAddModal({
   cropFile,
   onLabelChange,
   onHrefChange,
+  onStoreTypeChange,
   onComplete,
   onCancel,
 }: LookAddModalProps) {
@@ -304,6 +314,20 @@ function LookAddModal({
               onChange={(e) => onHrefChange(e.target.value)}
               className="max-w-xs"
             />
+          </div>
+          <div className="flex-1 min-w-[150px] space-y-1">
+            <label className="block text-xs uppercase tracking-wider text-muted-foreground">
+              Store Type
+            </label>
+            <select
+              value={cropFile.storeType}
+              onChange={(e) => onStoreTypeChange(e.target.value as "streetwear" | "formal" | "both")}
+              className="border-input h-9 w-full rounded-md border text-sm bg-transparent px-3"
+            >
+              <option value="both">Both</option>
+              <option value="streetwear">Streetwear</option>
+              <option value="formal">Formal</option>
+            </select>
           </div>
           <div className="flex gap-2">
             <button

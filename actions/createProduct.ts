@@ -21,6 +21,7 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
   const description = (formData.get("description") as string)?.trim() || null;
   const price = formData.get("price") as string;
   const categorySlug = formData.get("category") as string;
+  const storeType = (formData.get("storeType") as "streetwear" | "formal" | "both") || "both";
   const isVisible = formData.get("isVisible") === "true";
   const colorCount = parseInt(String(formData.get("color_count") ?? "0"), 10);
 
@@ -79,6 +80,7 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
         price: parseFloat(price).toFixed(2),
         category: "CLOTHING",
         categorySlug,
+        storeType,
         color: colorEntries[0]?.name ?? null,
         isVisible,
       })

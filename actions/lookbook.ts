@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { asc, eq, max } from "drizzle-orm";
+import { asc, eq, max, inArray, and } from "drizzle-orm";
 import { db } from "@/db";
 import { lookbookItems, sectionSettings } from "@/db/schema";
 import { uploadLookImage } from "@/lib/uploadImages";
@@ -48,11 +48,15 @@ export async function setLookbookSectionVisible(visible: boolean) {
   }
 }
 
-export async function getLookbookItems() {
+export async function getLookbookItems(storeType?: string) {
+  const conditions = [eq(lookbookItems.isActive, true)];
+  if (storeType) {
+    conditions.push(inArray(lookbookItems.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[]));
+  }
   return db
     .select()
     .from(lookbookItems)
-    .where(eq(lookbookItems.isActive, true))
+    .where(and(...conditions))
     .orderBy(asc(lookbookItems.order));
 }
 
@@ -81,14 +85,14 @@ export async function deleteLookbookItem(id: number) {
 
 export async function updateLookbookItem(
   id: number,
-  data: { label?: string; href?: string; order?: number }
+  data: { label?: string; href?: string; order?: number; storeType?: "streetwear" | "formal" | "both" }
 ) {
   const { userId, sessionClaims } = await auth();
   if (sessionClaims?.metadata?.role !== "admin") {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "lookbook.update" });
     redirect("/");
   }
-  const updateData: { label?: string; href?: string; order?: number } = { ...data };
+  const updateData: { label?: string; href?: string; order?: number; storeType?: "streetwear" | "formal" | "both" } = { ...data };
   if (data.href !== undefined) {
     const validated = validateHref(data.href);
     if (!validated.ok) throw new Error(validated.error);
@@ -108,6 +112,7 @@ export async function addLookbookItemFromFile(formData: FormData): Promise<{ err
 
   const file = formData.get("image") as File | null;
   const label = (formData.get("label") as string)?.trim();
+  const storeType = (formData.get("storeType") as "streetwear" | "formal" | "both") || "both";
   const hrefRaw = ((formData.get("href") as string)?.trim()) || "/shop";
   const hrefValidation = validateHref(hrefRaw);
   if (!hrefValidation.ok) return { error: hrefValidation.error };
@@ -130,6 +135,7 @@ export async function addLookbookItemFromFile(formData: FormData): Promise<{ err
     imageUrl: result.url,
     href,
     order: nextOrder,
+    storeType,
   }).returning({ id: lookbookItems.id });
   if (inserted) auditLog({ userId: userId!, action: "lookbook.add", target: String(inserted.id), details: { label } });
   return {};

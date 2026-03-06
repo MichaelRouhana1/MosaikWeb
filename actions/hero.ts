@@ -2,17 +2,21 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray, and } from "drizzle-orm";
 import { db } from "@/db";
 import { heroImages } from "@/db/schema";
 import { uploadHeroImage } from "@/lib/uploadImages";
 import { auditLog } from "@/lib/audit";
 
-export async function getHeroImages() {
+export async function getHeroImages(storeType?: string) {
+  const conditions = [eq(heroImages.isActive, true)];
+  if (storeType) {
+    conditions.push(inArray(heroImages.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[]));
+  }
   return db
     .select()
     .from(heroImages)
-    .where(eq(heroImages.isActive, true))
+    .where(and(...conditions))
     .orderBy(asc(heroImages.order));
 }
 
@@ -29,7 +33,7 @@ export async function getAllHeroImages() {
     .orderBy(asc(heroImages.order));
 }
 
-export async function addHeroImage(imageUrl: string, altText?: string) {
+export async function addHeroImage(imageUrl: string, altText?: string, storeType: "streetwear" | "formal" | "both" = "both") {
   const { userId, sessionClaims } = await auth();
   if (sessionClaims?.metadata?.role !== "admin") {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "hero.add" });
@@ -40,6 +44,7 @@ export async function addHeroImage(imageUrl: string, altText?: string) {
     .values({
       imageUrl,
       altText: altText ?? null,
+      storeType,
     })
     .returning();
   if (image) auditLog({ userId: userId!, action: "hero.add", target: String(image.id) });
@@ -62,12 +67,13 @@ export async function addHeroImageFromFile(formData: FormData): Promise<{ error?
   if (sessionClaims?.metadata?.role !== "admin") redirect("/");
 
   const file = formData.get("image") as File | null;
+  const storeType = (formData.get("storeType") as "streetwear" | "formal" | "both") || "both";
   if (!file?.size) return { error: "No image provided" };
 
   const filename = `hero-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const result = await uploadHeroImage(file, filename);
   if (result.error) return { error: result.error };
 
-  await addHeroImage(result.url);
+  await addHeroImage(result.url, undefined, storeType);
   return {};
 }

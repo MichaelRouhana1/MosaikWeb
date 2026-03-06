@@ -25,6 +25,12 @@ export const categoryLevelEnum = pgEnum("category_level", [
   "sub",
 ]);
 
+export const storeTypeEnum = pgEnum("store_type", [
+  "streetwear",
+  "formal",
+  "both",
+]);
+
 export const orderStatusEnum = pgEnum("order_status", [
   "PENDING",
   "PROCESSING",
@@ -68,6 +74,7 @@ export const products = pgTable("products", {
   categorySlug: text("category_slug"),
   color: text("color"),
   isVisible: boolean("is_visible").notNull().default(true),
+  storeType: storeTypeEnum("store_type").notNull().default("both"),
 });
 
 // Product colors - each color has its own image gallery
@@ -196,6 +203,7 @@ export const homeVideo = pgTable("home_video", {
   videoUrl: text("video_url").notNull(),
   caption: text("caption"),
   isActive: boolean("is_active").notNull().default(true),
+  storeType: storeTypeEnum("store_type").notNull().default("both"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -214,6 +222,7 @@ export const lookbookItems = pgTable("lookbook_items", {
   href: text("href").notNull().default("/shop"),
   order: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
+  storeType: storeTypeEnum("store_type").notNull().default("both"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -224,6 +233,7 @@ export const heroImages = pgTable("hero_images", {
   altText: text("alt_text"),
   order: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
+  storeType: storeTypeEnum("store_type").notNull().default("both"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

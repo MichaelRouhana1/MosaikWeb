@@ -1,0 +1,1 @@
+﻿actions/seed-categories.ts(40,33): error TS2322: Type '"category.seed_roots"' is not assignable to type 'AuditAction'.

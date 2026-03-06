@@ -38,10 +38,14 @@ export function Navbar() {
     }
   }, [pathname]);
 
+  const storeType = pathname?.split('/')[1];
+  const isStoreType = storeType === "streetwear" || storeType === "formal";
+
   const isAdmin = (sessionClaims?.metadata as { role?: string })?.role === "admin";
 
   if (pathname?.startsWith("/admin")) return null;
   if (pathname?.startsWith("/sign-in") || pathname?.startsWith("/sign-up")) return null;
+  if (pathname === "/") return null;
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
@@ -86,7 +90,7 @@ export function Navbar() {
 
           {/* Center: Logo */}
           <Link
-            href="/"
+            href={isStoreType ? `/${storeType}` : "/"}
             className="absolute left-1/2 -translate-x-1/2 text-xl font-light text-foreground tracking-[0.25em] uppercase hover:opacity-70 transition-opacity shrink-0"
           >
             MOSAIK

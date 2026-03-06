@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { products, productVariants, productColors, wishlists } from "@/db/schema";
 import { ShopClient } from "@/components/ShopClient";
-import { getValidCategorySlugs, getCategories, getStoreCategorySlugs, getStoreCategories } from "@/actions/categories";
+import { getValidCategorySlugs, getStoreCategorySlugs, getStoreCategories } from "@/actions/categories";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 
@@ -30,9 +30,8 @@ export default async function ShopPage({ params, searchParams }: ShopPageProps) 
   const catFilter = cat && validSlugs.includes(cat) && storeSlugs.includes(cat);
 
   const baseFilters = [eq(products.isVisible, true)];
-  if (storeSlugs.length > 0) {
-    baseFilters.push(inArray(products.categorySlug, storeSlugs));
-  }
+  baseFilters.push(inArray(products.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[]));
+
   if (catFilter && cat) {
     baseFilters.push(eq(products.categorySlug, cat));
   }
@@ -82,7 +81,7 @@ export default async function ShopPage({ params, searchParams }: ShopPageProps) 
     {}
   );
 
-  const categories = await getCategories();
+  // const categories = await getCategories(); // Not used
   const storeCategories = await getStoreCategories(storeType);
   const categoryLabel = catFilter && cat ? storeCategories.find((c) => c.slug === cat)?.label ?? null : null;
 

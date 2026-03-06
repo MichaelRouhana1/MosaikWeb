@@ -22,6 +22,7 @@ export function HeroAdminClient({ images: initialImages }: HeroAdminClientProps)
   const [cropFile, setCropFile] = useState<{ file: File; objectUrl: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [storeType, setStoreType] = useState<"streetwear" | "formal" | "both">("both");
 
   const cropFileRef = useRef<{ file: File; objectUrl: string } | null>(null);
   cropFileRef.current = cropFile;
@@ -52,6 +53,7 @@ export function HeroAdminClient({ images: initialImages }: HeroAdminClientProps)
       setIsAdding(true);
       const formData = new FormData();
       formData.append("image", file);
+      formData.append("storeType", storeType);
       const result = await addHeroImageFromFile(formData);
       setIsAdding(false);
 
@@ -61,7 +63,7 @@ export function HeroAdminClient({ images: initialImages }: HeroAdminClientProps)
       }
       router.refresh();
     },
-    [router]
+    [router, storeType]
   );
 
   const handleCropCancel = useCallback(() => {
@@ -93,17 +95,28 @@ export function HeroAdminClient({ images: initialImages }: HeroAdminClientProps)
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Hero Slideshow</h1>
-        <div {...getRootProps()}>
-          <input {...getInputProps()} />
-          <Button
-            type="button"
-            disabled={!!cropFile || isAdding}
-            className="cursor-pointer"
+        <div className="flex items-center gap-4">
+          <select
+            value={storeType}
+            onChange={(e) => setStoreType(e.target.value as "streetwear" | "formal" | "both")}
+            className="border-input h-9 px-3 rounded-md border text-sm bg-transparent"
           >
-            {isAdding ? "Adding…" : "Add Slide"}
-          </Button>
+            <option value="both">Store: Both</option>
+            <option value="streetwear">Store: Streetwear</option>
+            <option value="formal">Store: Formal</option>
+          </select>
+          <div {...getRootProps()}>
+            <input {...getInputProps()} />
+            <Button
+              type="button"
+              disabled={!!cropFile || isAdding}
+              className="cursor-pointer"
+            >
+              {isAdding ? "Adding…" : "Add Slide"}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -133,6 +146,10 @@ export function HeroAdminClient({ images: initialImages }: HeroAdminClientProps)
                   unoptimized
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 />
+              </div>
+              <div className="p-3 text-sm font-normal text-foreground flex justify-between">
+                <span>Slide #{img.id}</span>
+                <span className="capitalize opacity-60 bg-muted-foreground/10 px-2 rounded">{img.storeType}</span>
               </div>
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <Button

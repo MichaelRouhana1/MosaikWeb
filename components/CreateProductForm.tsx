@@ -171,6 +171,19 @@ export function CreateProductForm({ categories }: { categories: ProductCategory[
                 ))}
               </select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="storeType">Store Type</Label>
+              <select
+                id="storeType"
+                name="storeType"
+                required
+                className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="both">Both</option>
+                <option value="streetwear">Streetwear</option>
+                <option value="formal">Formal</option>
+              </select>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <input

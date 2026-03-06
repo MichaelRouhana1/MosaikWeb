@@ -1,0 +1,25 @@
+﻿
+> mosaikweb@0.1.0 lint
+> eslint
+
+
+C:\Users\PC FACTORY\Desktop\MosaikWeb\app\[storeType]\shop\page.tsx
+  84:9  warning  'categories' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\PC FACTORY\Desktop\MosaikWeb\components\HeroAdminClient.tsx
+   88:40  warning  'isDragActive' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  103:61  error    Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+
+C:\Users\PC FACTORY\Desktop\MosaikWeb\components\LookAdminClient.tsx
+  324:68  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\PC FACTORY\Desktop\MosaikWeb\components\ProductDetailClient.tsx
+  79:6  warning  React Hook useEffect has a missing dependency: 'imageUrls'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\PC FACTORY\Desktop\MosaikWeb\scripts\migrate-sale-columns.cjs
+  1:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  3:18  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+Γ£û 8 problems (5 errors, 3 warnings)
+

@@ -219,7 +219,7 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
             })
           ) : (
             [1, 2, 3, 4, 5, 6].map((i) => (
-              <Link key={i} href="/shop" className="flex-shrink-0 w-[220px] group">
+              <Link key={i} href={`/${storeType}/shop`} className="flex-shrink-0 w-[220px] group">
                 <div className="aspect-[2/3] overflow-hidden mb-4 bg-muted">
                   <div className="w-full h-full" />
                 </div>

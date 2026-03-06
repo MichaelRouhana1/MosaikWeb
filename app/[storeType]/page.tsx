@@ -30,7 +30,6 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
   if (storeType !== "streetwear" && storeType !== "formal") return notFound();
 
   const storeSlugs = await getStoreCategorySlugs(storeType);
-  if (storeSlugs.length === 0) return notFound(); // safeguard
 
   const [productList, heroImages, homeVideo, lookbookItems, lookbookSectionVisible, homeCategories, allCats] =
     await Promise.all([

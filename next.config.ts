@@ -34,11 +34,11 @@ const nextConfig: NextConfig = {
           },
           ...(process.env.NODE_ENV === "production"
             ? [
-                {
-                  key: "Strict-Transport-Security",
-                  value: "max-age=63072000; includeSubDomains; preload",
-                },
-              ]
+              {
+                key: "Strict-Transport-Security",
+                value: "max-age=63072000; includeSubDomains; preload",
+              },
+            ]
             : []),
           {
             key: "Content-Security-Policy",
@@ -50,6 +50,8 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https:",
               "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://*.supabase.co wss://*.clerk.accounts.dev",
               "frame-src https://*.clerk.accounts.dev https://*.clerk.com",
+              "worker-src 'self' blob:",
+              "child-src 'self' blob:",
             ].join("; "),
           },
         ],

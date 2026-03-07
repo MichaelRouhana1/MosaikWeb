@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray, and } from "drizzle-orm";
 import { db } from "@/db";
 import { productCategories } from "@/db/schema";
 import { uploadProductImage } from "@/lib/uploadImages";
@@ -16,32 +16,22 @@ export async function getValidCategorySlugs(): Promise<string[]> {
   return cats.map((c) => c.slug);
 }
 
-/** Get all category slugs descending from a specific root storeType */
+/** Get all category slugs for a specific storeType */
 export async function getStoreCategorySlugs(storeType: string): Promise<string[]> {
-  const allCats = await db.select().from(productCategories);
-  const root = allCats.find(c => c.slug === storeType && c.level === "root");
-  if (!root) return [];
-
-  const slugs = new Set<string>([root.slug]);
-
-  function addSlugs(parentId: number) {
-    const children = allCats.filter(c => c.parentId === parentId);
-    for (const child of children) {
-      slugs.add(child.slug);
-      addSlugs(child.id);
-    }
-  }
-
-  addSlugs(root.id);
-  return Array.from(slugs);
+  const cats = await db
+    .select({ slug: productCategories.slug })
+    .from(productCategories)
+    .where(inArray(productCategories.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[]));
+  return cats.map((c) => c.slug);
 }
 
 /** Get only the category definitions for a specific store type */
 export async function getStoreCategories(storeType: string): Promise<ProductCategory[]> {
-  const storeSlugs = await getStoreCategorySlugs(storeType);
-  if (storeSlugs.length === 0) return [];
-  const allCats = await db.select().from(productCategories).orderBy(asc(productCategories.sortOrder), asc(productCategories.id));
-  return allCats.filter(c => storeSlugs.includes(c.slug) && c.level !== "root");
+  return db
+    .select()
+    .from(productCategories)
+    .where(inArray(productCategories.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[]))
+    .orderBy(asc(productCategories.sortOrder), asc(productCategories.id));
 }
 
 /** All categories for burger menu, shop, etc. */
@@ -61,12 +51,17 @@ export async function getSubcategories(parentId: number): Promise<ProductCategor
     .orderBy(asc(productCategories.sortOrder), asc(productCategories.id));
 }
 
-/** Categories to show on home page (show_on_home, limit 6) */
-export async function getCategoriesForHome(): Promise<ProductCategory[]> {
+/** Categories to show on home page (show_on_home, limit 6 per store) */
+export async function getCategoriesForHome(storeType: string): Promise<ProductCategory[]> {
   return db
     .select()
     .from(productCategories)
-    .where(eq(productCategories.showOnHome, true))
+    .where(
+      and(
+        eq(productCategories.showOnHome, true),
+        inArray(productCategories.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[])
+      )
+    )
     .orderBy(asc(productCategories.sortOrder))
     .limit(6);
 }
@@ -96,6 +91,7 @@ export async function createCategory(formData: FormData): Promise<{ error?: stri
   const parentIdStr = formData.get("parentId") as string | null;
   const parentId = parentIdStr ? parseInt(parentIdStr, 10) : null;
   const level = (formData.get("level") as "root" | "main" | "sub") || "main";
+  const storeType = (formData.get("storeType") as "streetwear" | "formal" | "both") || "both";
 
   if (!slug) return { error: "Slug is required" };
   if (!label) return { error: "Label is required" };
@@ -107,8 +103,8 @@ export async function createCategory(formData: FormData): Promise<{ error?: stri
     const homeCount = await db
       .select({ id: productCategories.id })
       .from(productCategories)
-      .where(eq(productCategories.showOnHome, true));
-    if (homeCount.length >= 6) return { error: "Maximum 6 categories can be shown on the home page" };
+      .where(and(eq(productCategories.showOnHome, true), eq(productCategories.storeType, storeType)));
+    if (homeCount.length >= 6) return { error: `Maximum 6 categories can be shown on the ${storeType} home page` };
   }
 
   let imageUrl: string | null = null;
@@ -130,6 +126,7 @@ export async function createCategory(formData: FormData): Promise<{ error?: stri
     sortOrder: nextSortOrder,
     parentId,
     level,
+    storeType,
   });
   auditLog({ userId: userId!, action: "category.create", target: slug, details: { label } });
   return {};
@@ -153,6 +150,7 @@ export async function updateCategory(
   const parentIdStr = formData.get("parentId") as string | null;
   const parentId = parentIdStr ? parseInt(parentIdStr, 10) : null;
   const level = (formData.get("level") as "root" | "main" | "sub") || "main";
+  const storeType = (formData.get("storeType") as "streetwear" | "formal" | "both") || "both";
 
   if (!slug) return { error: "Slug is required" };
   if (!label) return { error: "Label is required" };
@@ -167,8 +165,8 @@ export async function updateCategory(
     const homeCount = await db
       .select({ id: productCategories.id })
       .from(productCategories)
-      .where(eq(productCategories.showOnHome, true));
-    if (homeCount.length >= 6) return { error: "Maximum 6 categories can be shown on the home page" };
+      .where(and(eq(productCategories.showOnHome, true), eq(productCategories.storeType, storeType)));
+    if (homeCount.length >= 6) return { error: `Maximum 6 categories can be shown on the ${storeType} home page` };
   }
 
   let imageUrl: string | null = existing.image;
@@ -180,7 +178,7 @@ export async function updateCategory(
 
   await db
     .update(productCategories)
-    .set({ slug, label, image: imageUrl, showOnHome, parentId, level })
+    .set({ slug, label, image: imageUrl, showOnHome, parentId, level, storeType })
     .where(eq(productCategories.id, id));
   auditLog({ userId: userId!, action: "category.update", target: String(id), details: { slug, label } });
   return {};

@@ -43,7 +43,7 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
       getHomeVideo(storeType),
       getLookbookItems(storeType),
       getLookbookSectionVisible(),
-      getCategoriesForHome(),
+      getCategoriesForHome(storeType),
       db.select().from(productCategories),
     ]);
 

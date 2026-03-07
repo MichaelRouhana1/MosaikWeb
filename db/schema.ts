@@ -57,6 +57,7 @@ export const productCategories = pgTable("product_categories", {
   sortOrder: integer("sort_order").notNull().default(0),
   parentId: integer("parent_id").references((): AnyPgColumn => productCategories.id),
   level: categoryLevelEnum("level").notNull().default("main"),
+  storeType: storeTypeEnum("store_type").notNull().default("streetwear"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

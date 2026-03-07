@@ -17,9 +17,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 interface CategoriesAdminClientProps {
   categories: ProductCategory[];
+  initialStoreType: "streetwear" | "formal";
 }
 
-export function CategoriesAdminClient({ categories: initialCategories }: CategoriesAdminClientProps) {
+export function CategoriesAdminClient({ categories: initialCategories, initialStoreType }: CategoriesAdminClientProps) {
   const router = useRouter();
   const [categories, setCategories] = useState(initialCategories);
   useEffect(() => {
@@ -34,12 +35,14 @@ export function CategoriesAdminClient({ categories: initialCategories }: Categor
   const [formLabel, setFormLabel] = useState("");
   const [formShowOnHome, setFormShowOnHome] = useState(false);
   const [formImage, setFormImage] = useState<File | null>(null);
+  const [formStoreType, setFormStoreType] = useState<"streetwear" | "formal" | "both">(initialStoreType);
 
   const resetForm = useCallback(() => {
     setFormSlug("");
     setFormLabel("");
     setFormShowOnHome(false);
     setFormImage(null);
+    setFormStoreType(initialStoreType);
     setEditingId(null);
     setAdding(false);
     setError(null);
@@ -55,6 +58,9 @@ export function CategoriesAdminClient({ categories: initialCategories }: Categor
     setFormSlug(cat.slug);
     setFormLabel(cat.label);
     setFormShowOnHome(cat.showOnHome);
+    // @ts-ignore - storeType was added to schema but TypeScript might not know it
+    const catStoreType = (cat as any).storeType || "both";
+    setFormStoreType(catStoreType);
     setEditingId(cat.id);
   };
 
@@ -65,6 +71,7 @@ export function CategoriesAdminClient({ categories: initialCategories }: Categor
     formData.set("slug", formSlug);
     formData.set("label", formLabel);
     formData.set("showOnHome", String(formShowOnHome));
+    formData.set("storeType", formStoreType);
     if (formImage) formData.set("image", formImage);
 
     if (editingId) {
@@ -145,6 +152,19 @@ export function CategoriesAdminClient({ categories: initialCategories }: Categor
             />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="storeType">Store</Label>
+            <select
+              id="storeType"
+              value={formStoreType}
+              onChange={(e) => setFormStoreType(e.target.value as any)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="streetwear">Streetwear</option>
+              <option value="formal">Formal</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="label">Label (display name)</Label>
             <Input
               id="label"
@@ -195,6 +215,7 @@ export function CategoriesAdminClient({ categories: initialCategories }: Categor
           <thead className="bg-muted">
             <tr>
               <th className="text-left p-4 font-medium">Image</th>
+              <th className="text-left p-4 font-medium">Store</th>
               <th className="text-left p-4 font-medium">Slug</th>
               <th className="text-left p-4 font-medium">Label</th>
               <th
@@ -226,6 +247,7 @@ export function CategoriesAdminClient({ categories: initialCategories }: Categor
                     )}
                   </div>
                 </td>
+                <td className="p-4 capitalize">{(cat as any).storeType || "streetwear"}</td>
                 <td className="p-4 font-mono text-muted-foreground">{cat.slug}</td>
                 <td className="p-4">{cat.label}</td>
                 <td className="p-4">{cat.showOnHome ? "Yes" : "No"}</td>

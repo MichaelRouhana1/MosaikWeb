@@ -161,8 +161,13 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Get the Look</h1>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">Get the Look</h1>
+          <span className="px-2.5 py-1 text-xs font-medium bg-muted text-muted-foreground rounded-full capitalize">
+            Managing: {initialStoreType}
+          </span>
+        </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
             <Checkbox
@@ -186,7 +191,7 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
 
       {items.length === 0 ? (
         <div className="border border-dashed border-border rounded-lg p-12 text-center text-muted-foreground">
-          <p className="mb-4">No looks yet.</p>
+          <p className="mb-4">No items found for this store. Add your first <span className="capitalize">{initialStoreType}</span> item.</p>
           <div {...getRootProps()}>
             <input {...getInputProps()} />
             <Button variant="outline" type="button" className="cursor-pointer">
@@ -239,9 +244,6 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
           onHrefChange={(href) =>
             setCropFile((prev) => (prev ? { ...prev, href } : null))
           }
-          onStoreTypeChange={(storeType) =>
-            setCropFile((prev) => (prev ? { ...prev, storeType } : null))
-          }
           onComplete={handleCropComplete}
           onCancel={handleCropCancel}
         />
@@ -254,7 +256,6 @@ interface LookAddModalProps {
   cropFile: { file: File; objectUrl: string; label: string; href: string; storeType: "streetwear" | "formal" | "both" };
   onLabelChange: (label: string) => void;
   onHrefChange: (href: string) => void;
-  onStoreTypeChange: (storeType: "streetwear" | "formal" | "both") => void;
   onComplete: (blob: Blob) => void;
   onCancel: () => void;
 }
@@ -263,7 +264,6 @@ function LookAddModal({
   cropFile,
   onLabelChange,
   onHrefChange,
-  onStoreTypeChange,
   onComplete,
   onCancel,
 }: LookAddModalProps) {
@@ -315,20 +315,6 @@ function LookAddModal({
               onChange={(e) => onHrefChange(e.target.value)}
               className="max-w-xs"
             />
-          </div>
-          <div className="flex-1 min-w-[150px] space-y-1">
-            <label className="block text-xs uppercase tracking-wider text-muted-foreground">
-              Store Type
-            </label>
-            <select
-              value={cropFile.storeType}
-              onChange={(e) => onStoreTypeChange(e.target.value as "streetwear" | "formal" | "both")}
-              className="border-input h-9 w-full rounded-md border text-sm bg-transparent px-3"
-            >
-              <option value="both">Both</option>
-              <option value="streetwear">Streetwear</option>
-              <option value="formal">Formal</option>
-            </select>
           </div>
           <div className="flex gap-2">
             <button

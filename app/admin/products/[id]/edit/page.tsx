@@ -5,6 +5,7 @@ import { products, productVariants, productColors } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { EditProductForm } from "@/components/EditProductForm";
 import { getCategories } from "@/actions/categories";
+import { getAdminStoreType } from "@/actions/admin-store";
 
 export default async function EditProductPage({
   params,
@@ -28,7 +29,8 @@ export default async function EditProductPage({
     db.select().from(productColors).where(eq(productColors.productId, productId)),
   ]);
 
-  const categories = await getCategories();
+  const storeType = await getAdminStoreType();
+  const categories = await getCategories(storeType);
   const firstColorImages = colors[0]?.imageUrls ?? [];
   const productWithImages = { ...product, images: firstColorImages };
 

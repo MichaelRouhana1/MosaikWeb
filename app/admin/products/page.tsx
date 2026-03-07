@@ -104,7 +104,12 @@ export default async function AdminProductsPage({
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">Products</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">Products</h1>
+          <span className="px-2.5 py-1 text-xs font-medium bg-muted text-muted-foreground rounded-full capitalize">
+            Managing: {adminStore}
+          </span>
+        </div>
         <Link
           href="/admin/products/new"
           className="px-6 py-2.5 bg-foreground text-background text-sm font-medium uppercase tracking-wider hover:opacity-90 transition-opacity"
@@ -119,6 +124,7 @@ export default async function AdminProductsPage({
           initialQuery={q}
           initialCategory={category}
           categories={categories}
+          storeType={adminStore}
         />
       </Suspense>
     </div>

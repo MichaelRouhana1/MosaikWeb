@@ -35,10 +35,15 @@ export async function getStoreCategories(storeType: string): Promise<ProductCate
 }
 
 /** All categories for burger menu, shop, etc. */
-export async function getCategories(): Promise<ProductCategory[]> {
+export async function getCategories(storeType?: string): Promise<ProductCategory[]> {
+  const conditions = [];
+  if (storeType) {
+    conditions.push(inArray(productCategories.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[]));
+  }
   return db
     .select()
     .from(productCategories)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(productCategories.sortOrder), asc(productCategories.id));
 }
 

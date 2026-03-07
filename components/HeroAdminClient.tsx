@@ -23,7 +23,6 @@ export function HeroAdminClient({ images: initialImages, initialStoreType }: Her
   const [cropFile, setCropFile] = useState<{ file: File; objectUrl: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [storeType, setStoreType] = useState<"streetwear" | "formal" | "both">(initialStoreType);
 
   const cropFileRef = useRef<{ file: File; objectUrl: string } | null>(null);
   cropFileRef.current = cropFile;
@@ -54,7 +53,7 @@ export function HeroAdminClient({ images: initialImages, initialStoreType }: Her
       setIsAdding(true);
       const formData = new FormData();
       formData.append("image", file);
-      formData.append("storeType", storeType);
+      formData.append("storeType", initialStoreType);
       const result = await addHeroImageFromFile(formData);
       setIsAdding(false);
 
@@ -64,7 +63,7 @@ export function HeroAdminClient({ images: initialImages, initialStoreType }: Her
       }
       router.refresh();
     },
-    [router, storeType]
+    [router, initialStoreType]
   );
 
   const handleCropCancel = useCallback(() => {
@@ -97,17 +96,14 @@ export function HeroAdminClient({ images: initialImages, initialStoreType }: Her
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Hero Slideshow</h1>
         <div className="flex items-center gap-4">
-          <select
-            value={storeType}
-            onChange={(e) => setStoreType(e.target.value as "streetwear" | "formal" | "both")}
-            className="border-input h-9 px-3 rounded-md border text-sm bg-transparent"
-          >
-            <option value="both">Store: Both</option>
-            <option value="streetwear">Store: Streetwear</option>
-            <option value="formal">Store: Formal</option>
-          </select>
+          <h1 className="text-2xl font-bold">Hero Slideshow</h1>
+          <span className="px-2.5 py-1 text-xs font-medium bg-muted text-muted-foreground rounded-full capitalize">
+            Managing: {initialStoreType}
+          </span>
+        </div>
+        <div className="flex items-center gap-4">
+
           <div {...getRootProps()}>
             <input {...getInputProps()} />
             <Button
@@ -123,7 +119,7 @@ export function HeroAdminClient({ images: initialImages, initialStoreType }: Her
 
       {images.length === 0 ? (
         <div className="border border-dashed border-border rounded-lg p-12 text-center text-muted-foreground">
-          <p className="mb-4">No hero images yet.</p>
+          <p className="mb-4">No items found for this store. Add your first <span className="capitalize">{initialStoreType}</span> item.</p>
           <div {...getRootProps()}>
             <input {...getInputProps()} />
             <Button variant="outline" type="button" className="cursor-pointer">

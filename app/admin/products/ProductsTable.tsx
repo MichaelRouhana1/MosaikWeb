@@ -65,6 +65,7 @@ interface ProductsTableProps {
   initialQuery?: string;
   initialCategory?: string;
   categories: ProductCategoryRow[];
+  storeType?: string;
 }
 
 export function ProductsTable({
@@ -72,6 +73,7 @@ export function ProductsTable({
   initialQuery = "",
   initialCategory = "all",
   categories,
+  storeType = "streetwear",
 }: ProductsTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -181,23 +183,23 @@ export function ProductsTable({
       size: 40,
       header: ({ table }) => (
         <div className="w-10">
-        <Checkbox
-          checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && "indeterminate")
-          }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+          />
         </div>
       ),
       cell: ({ row }) => (
         <div className="w-10">
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-        />
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
         </div>
       ),
       enableSorting: false,
@@ -278,11 +280,10 @@ export function ProductsTable({
       header: "Status",
       cell: ({ row }) => (
         <span
-          className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-            row.original.isVisible
+          className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${row.original.isVisible
               ? "bg-muted text-foreground"
               : "bg-muted/50 text-muted-foreground"
-          }`}
+            }`}
         >
           {row.original.isVisible ? "Visible" : "Hidden"}
         </span>
@@ -412,9 +413,9 @@ export function ProductsTable({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-2 text-center text-muted-foreground"
+                  className="px-4 py-8 text-center text-muted-foreground"
                 >
-                  No products found
+                  No items found for this store. Add your first <span className="capitalize">{storeType}</span> item.
                 </td>
               </tr>
             ) : (

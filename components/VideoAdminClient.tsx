@@ -95,8 +95,13 @@ export function VideoAdminClient({ video: initialVideo, initialStoreType }: Vide
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Home Page Video</h1>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">Home Page Video</h1>
+          <span className="px-2.5 py-1 text-xs font-medium bg-muted text-muted-foreground rounded-full capitalize">
+            Managing: {initialStoreType}
+          </span>
+        </div>
         <div {...getRootProps()}>
           <input {...getInputProps()} />
           <Button
@@ -111,7 +116,7 @@ export function VideoAdminClient({ video: initialVideo, initialStoreType }: Vide
 
       {!video ? (
         <div className="border border-dashed border-border rounded-lg p-12 text-center text-muted-foreground">
-          <p className="mb-4">No video yet.</p>
+          <p className="mb-4">No items found for this store. Add your first <span className="capitalize">{initialStoreType}</span> item.</p>
           <div {...getRootProps()}>
             <input {...getInputProps()} />
             <Button variant="outline" type="button" className="cursor-pointer">

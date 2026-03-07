@@ -14,15 +14,16 @@ const HERO_ASPECT = 72 / 25;
 
 interface HeroAdminClientProps {
   images: HeroImage[];
+  initialStoreType: "streetwear" | "formal";
 }
 
-export function HeroAdminClient({ images: initialImages }: HeroAdminClientProps) {
+export function HeroAdminClient({ images: initialImages, initialStoreType }: HeroAdminClientProps) {
   const router = useRouter();
   const [images, setImages] = useState(initialImages);
   const [cropFile, setCropFile] = useState<{ file: File; objectUrl: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [storeType, setStoreType] = useState<"streetwear" | "formal" | "both">("both");
+  const [storeType, setStoreType] = useState<"streetwear" | "formal" | "both">(initialStoreType);
 
   const cropFileRef = useRef<{ file: File; objectUrl: string } | null>(null);
   cropFileRef.current = cropFile;

@@ -51,7 +51,7 @@ export async function setLookbookSectionVisible(visible: boolean) {
 export async function getLookbookItems(storeType?: string) {
   const conditions = [eq(lookbookItems.isActive, true)];
   if (storeType) {
-    conditions.push(inArray(lookbookItems.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[]));
+    conditions.push(eq(lookbookItems.storeType, storeType as "streetwear" | "formal"));
   }
   return db
     .select()

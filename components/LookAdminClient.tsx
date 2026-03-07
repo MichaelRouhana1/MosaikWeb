@@ -53,9 +53,10 @@ async function getCroppedBlob(imageSrc: string, pixelCrop: Area): Promise<Blob> 
 interface LookAdminClientProps {
   items: LookbookItem[];
   sectionVisible: boolean;
+  initialStoreType: "streetwear" | "formal";
 }
 
-export function LookAdminClient({ items: initialItems, sectionVisible: initialSectionVisible }: LookAdminClientProps) {
+export function LookAdminClient({ items: initialItems, sectionVisible: initialSectionVisible, initialStoreType }: LookAdminClientProps) {
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
   const [cropFile, setCropFile] = useState<{
@@ -93,9 +94,9 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
     if (acceptedFiles.length >= 1) {
       const file = acceptedFiles[0];
       const url = URL.createObjectURL(file);
-      setCropFile({ file, objectUrl: url, label: "", href: "/shop", storeType: "both" });
+      setCropFile({ file, objectUrl: url, label: "", href: "/shop", storeType: initialStoreType });
     }
-  }, []);
+  }, [initialStoreType]);
 
   const handleCropComplete = useCallback(
     async (blob: Blob) => {

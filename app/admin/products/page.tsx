@@ -5,6 +5,8 @@ import { products, productVariants, productColors } from "@/db/schema";
 import { inArray, desc } from "drizzle-orm";
 import { ProductsTable } from "./ProductsTable";
 import { getCategories } from "@/actions/categories";
+import { getAdminStoreType } from "@/actions/admin-store";
+import { eq } from "drizzle-orm";
 
 export default async function AdminProductsPage({
   searchParams,
@@ -18,9 +20,12 @@ export default async function AdminProductsPage({
   const categories = await getCategories();
   const categoryLabels = Object.fromEntries(categories.map((c) => [c.slug, c.label]));
 
+  const adminStore = await getAdminStoreType();
+
   let productList = await db
     .select()
     .from(products)
+    .where(eq(products.storeType, adminStore))
     .orderBy(desc(products.id));
 
   if (q) {
@@ -39,15 +44,15 @@ export default async function AdminProductsPage({
   const [variants, colorsList] =
     productIds.length > 0
       ? await Promise.all([
-          db
-            .select()
-            .from(productVariants)
-            .where(inArray(productVariants.productId, productIds)),
-          db
-            .select()
-            .from(productColors)
-            .where(inArray(productColors.productId, productIds)),
-        ])
+        db
+          .select()
+          .from(productVariants)
+          .where(inArray(productVariants.productId, productIds)),
+        db
+          .select()
+          .from(productColors)
+          .where(inArray(productColors.productId, productIds)),
+      ])
       : [[], []];
 
   const colorById = Object.fromEntries(colorsList.map((c) => [c.id, c]));

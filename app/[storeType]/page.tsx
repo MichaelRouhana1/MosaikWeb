@@ -36,7 +36,7 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
       db
         .select()
         .from(products)
-        .where(and(eq(products.isVisible, true), inArray(products.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[])))
+        .where(and(eq(products.isVisible, true), eq(products.storeType, storeType as "streetwear" | "formal")))
         .orderBy(desc(products.id))
         .limit(8),
       getHeroImages(storeType),
@@ -90,24 +90,18 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
             unoptimized
           />
           <div className="relative z-10 max-w-[36ch] text-center px-6">
-            <h1 className="text-xl font-normal text-foreground mb-4">
-              Clothing designed with intention.
+            <h1 className="text-3xl font-normal text-foreground mb-4 capitalize">
+              {storeType} Collection
             </h1>
             <p className="text-sm font-light text-foreground/90">
-              Modern silhouettes. Thoughtful materials. Built to last.
+              Coming soon. We are carefully curating our new collection.
             </p>
             <div className="flex justify-center gap-6 mt-8 relative z-20">
               <Link
-                href="/streetwear/shop"
+                href="/"
                 className="inline-block text-sm font-normal text-foreground border-b border-foreground pb-1 hover:opacity-60 transition-opacity duration-200"
               >
-                Shop Streetwear
-              </Link>
-              <Link
-                href="/formal/shop"
-                className="inline-block text-sm font-normal text-foreground border-b border-foreground pb-1 hover:opacity-60 transition-opacity duration-200"
-              >
-                Shop Formal
+                Back to Mosaik
               </Link>
             </div>
           </div>
@@ -226,15 +220,11 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
               );
             })
           ) : (
-            [1, 2, 3, 4, 5, 6].map((i) => (
-              <Link key={i} href={`/${storeType}/shop`} className="flex-shrink-0 w-[220px] group">
-                <div className="aspect-[2/3] overflow-hidden mb-4 bg-muted">
-                  <div className="w-full h-full" />
-                </div>
-                <p className="text-sm font-normal text-foreground">—</p>
-                <p className="text-sm font-light text-muted-foreground mt-1">—</p>
-              </Link>
-            ))
+            <div className="w-full text-center py-12">
+              <p className="text-sm font-normal text-muted-foreground">
+                No products available yet. Check back soon.
+              </p>
+            </div>
           )}
         </div>
       </section>
@@ -311,7 +301,7 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
             </ul>
           </div>
         </div>
-      </footer>
-    </div>
+      </footer >
+    </div >
   );
 }

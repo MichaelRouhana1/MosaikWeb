@@ -14,9 +14,10 @@ const VIDEO_ASPECT = 4 / 5;
 
 interface VideoAdminClientProps {
   video: HomeVideo | null;
+  initialStoreType: "streetwear" | "formal";
 }
 
-export function VideoAdminClient({ video: initialVideo }: VideoAdminClientProps) {
+export function VideoAdminClient({ video: initialVideo, initialStoreType }: VideoAdminClientProps) {
   const router = useRouter();
   const [video, setVideo] = useState<HomeVideo | null>(initialVideo);
   const [cropFile, setCropFile] = useState<{ file: File; objectUrl: string } | null>(null);
@@ -44,6 +45,7 @@ export function VideoAdminClient({ video: initialVideo }: VideoAdminClientProps)
       setIsAdding(true);
       const formData = new FormData();
       formData.append("video", file);
+      formData.append("storeType", initialStoreType);
       const result = await addHomeVideoFromFile(formData);
       setIsAdding(false);
 

@@ -3,15 +3,32 @@
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
+import { setAdminStoreType } from "@/actions/admin-store";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 
 interface AdminHeaderProps {
   onMenuClick?: () => void;
+  initialStore: "streetwear" | "formal";
 }
 
-export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
+export function AdminHeader({ onMenuClick, initialStore }: AdminHeaderProps) {
   const { user } = useUser();
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [currentStore, setCurrentStore] = useState(initialStore);
+
   const email = user?.primaryEmailAddress?.emailAddress ?? "admin@mosaik.com";
+
+  const toggleStore = async (newStore: "streetwear" | "formal") => {
+    if (newStore === currentStore) return;
+    setCurrentStore(newStore);
+    startTransition(async () => {
+      await setAdminStoreType(newStore);
+      router.refresh();
+    });
+  };
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -40,23 +57,47 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
         </Link>
       </div>
       <div className="flex items-center gap-4 ml-auto">
-      <button
-        type="button"
-        onClick={toggleTheme}
-        className="text-muted-foreground hover:text-foreground transition-colors p-2"
-        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      >
-        {theme === "dark" ? (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
-        ) : (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-          </svg>
-        )}
-      </button>
-      <span className="text-sm text-muted-foreground truncate max-w-[200px]">{email}</span>
+        {/* Store Toggle */}
+        <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
+          <button
+            onClick={() => toggleStore("streetwear")}
+            disabled={isPending}
+            className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-sm transition-all ${currentStore === "streetwear"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+              }`}
+          >
+            Streetwear
+          </button>
+          <button
+            onClick={() => toggleStore("formal")}
+            disabled={isPending}
+            className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-sm transition-all ${currentStore === "formal"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+              }`}
+          >
+            Formal
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="text-muted-foreground hover:text-foreground transition-colors p-2"
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          )}
+        </button>
+        <span className="text-sm text-muted-foreground truncate max-w-[200px]">{email}</span>
       </div>
     </header>
   );

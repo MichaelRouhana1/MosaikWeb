@@ -1,9 +1,11 @@
 import { AdminLayoutClient } from "@/components/AdminLayoutClient";
+import { getAdminStoreType } from "@/actions/admin-store";
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <AdminLayoutClient>{children}</AdminLayoutClient>;
+  const storeType = await getAdminStoreType();
+  return <AdminLayoutClient initialStore={storeType}>{children}</AdminLayoutClient>;
 }

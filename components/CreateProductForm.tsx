@@ -28,7 +28,13 @@ interface ColorEntry {
   stockBySize: Record<string, number>;
 }
 
-export function CreateProductForm({ categories }: { categories: ProductCategory[] }) {
+export function CreateProductForm({
+  categories,
+  initialStoreType = "streetwear"
+}: {
+  categories: ProductCategory[];
+  initialStoreType?: "streetwear" | "formal" | "both";
+}) {
   const router = useRouter();
   const [colors, setColors] = useState<ColorEntry[]>([]);
   const [state, setState] = useState<{ error?: string; productId?: number } | null>(null);
@@ -177,6 +183,7 @@ export function CreateProductForm({ categories }: { categories: ProductCategory[
                 id="storeType"
                 name="storeType"
                 required
+                defaultValue={initialStoreType}
                 className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="both">Both</option>

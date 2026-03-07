@@ -12,7 +12,7 @@ import { auditLog } from "@/lib/audit";
 export async function getHomeVideo(storeType?: string) {
   const conditions = [eq(homeVideo.isActive, true)];
   if (storeType) {
-    conditions.push(inArray(homeVideo.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[]));
+    conditions.push(eq(homeVideo.storeType, storeType as "streetwear" | "formal"));
   }
   const [video] = await db
     .select()
@@ -23,16 +23,20 @@ export async function getHomeVideo(storeType?: string) {
 }
 
 /** Fetches the active home video for admin. */
-export async function getHomeVideoForAdmin() {
+export async function getHomeVideoForAdmin(storeType?: string) {
   const { userId, sessionClaims } = await auth();
   if (sessionClaims?.metadata?.role !== "admin") {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "video.list" });
     redirect("/");
   }
+  const conditions = [eq(homeVideo.isActive, true)];
+  if (storeType) {
+    conditions.push(inArray(homeVideo.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[]));
+  }
   const [video] = await db
     .select()
     .from(homeVideo)
-    .where(eq(homeVideo.isActive, true))
+    .where(and(...conditions))
     .limit(1);
   return video ?? null;
 }

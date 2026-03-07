@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getHomeVideoForAdmin } from "@/actions/video";
 import { VideoAdminClient } from "@/components/VideoAdminClient";
+import { getAdminStoreType } from "@/actions/admin-store";
 
 export default async function AdminVideoPage() {
   const { sessionClaims } = await auth();
@@ -9,7 +10,8 @@ export default async function AdminVideoPage() {
     redirect("/");
   }
 
-  const video = await getHomeVideoForAdmin();
+  const storeType = await getAdminStoreType();
+  const video = await getHomeVideoForAdmin(storeType);
 
-  return <VideoAdminClient video={video} />;
+  return <VideoAdminClient video={video} initialStoreType={storeType} />;
 }

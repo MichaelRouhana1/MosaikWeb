@@ -100,7 +100,7 @@ export function Navbar() {
           <div className="flex items-center gap-3 lg:gap-6 shrink-0">
             {/* Desktop-only text links */}
             <Link
-              href="/shop"
+              href={isStoreType ? `/${storeType}/shop` : "/shop"}
               className="hidden lg:inline text-sm font-normal text-foreground hover:opacity-70 transition-opacity"
             >
               Search
@@ -209,7 +209,7 @@ export function Navbar() {
               </button>
               <div className="border-t border-border my-3" />
               <Link
-                href="/shop"
+                href={isStoreType ? `/${storeType}/shop` : "/shop"}
                 onClick={() => setBurgerOpen(false)}
                 className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50"
                 role="menuitem"

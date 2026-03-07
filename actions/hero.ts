@@ -11,7 +11,7 @@ import { auditLog } from "@/lib/audit";
 export async function getHeroImages(storeType?: string) {
   const conditions = [eq(heroImages.isActive, true)];
   if (storeType) {
-    conditions.push(inArray(heroImages.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[]));
+    conditions.push(eq(heroImages.storeType, storeType as "streetwear" | "formal"));
   }
   return db
     .select()

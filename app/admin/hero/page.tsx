@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getAllHeroImages } from "@/actions/hero";
 import { HeroAdminClient } from "@/components/HeroAdminClient";
+import { getAdminStoreType } from "@/actions/admin-store";
 
 export default async function AdminHeroPage() {
   const { sessionClaims } = await auth();
@@ -9,7 +10,11 @@ export default async function AdminHeroPage() {
     redirect("/");
   }
 
-  const images = await getAllHeroImages();
+  const storeType = await getAdminStoreType();
+  const allImages = await getAllHeroImages();
 
-  return <HeroAdminClient images={images} />;
+  // Filter by currently selected admin store (plus "both")
+  const images = allImages.filter((img) => img.storeType === storeType || img.storeType === "both");
+
+  return <HeroAdminClient images={images} initialStoreType={storeType} />;
 }

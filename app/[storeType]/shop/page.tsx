@@ -40,7 +40,7 @@ export default async function ShopPage({ params, searchParams }: ShopPageProps) 
   const catFilter = cat && validSlugs.includes(cat) && storeSlugs.includes(cat);
 
   const baseFilters = [eq(products.isVisible, true)];
-  baseFilters.push(inArray(products.storeType, [storeType, "both"] as ("streetwear" | "formal" | "both")[]));
+  baseFilters.push(eq(products.storeType, storeType as "streetwear" | "formal"));
 
   if (catFilter && cat) {
     baseFilters.push(eq(products.categorySlug, cat));

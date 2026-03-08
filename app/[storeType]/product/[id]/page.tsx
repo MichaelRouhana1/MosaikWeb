@@ -35,7 +35,7 @@ export default async function ProductPage({
   const [product] = await db
     .select()
     .from(products)
-    .where(eq(products.id, productId))
+    .where(and(eq(products.id, productId), eq(products.storeType, storeType as "streetwear" | "formal")))
     .limit(1);
 
   if (!product || !product.isVisible) notFound();
@@ -56,6 +56,7 @@ export default async function ProductPage({
       and(
         eq(products.isVisible, true),
         eq(products.categorySlug, categorySlug),
+        eq(products.storeType, storeType as "streetwear" | "formal"),
         ne(products.id, productId)
       )
     )

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { db } from "@/db";
 import { products, orders } from "@/db/schema";
-import { sql, desc, gte } from "drizzle-orm";
+import { sql, desc, gte, eq } from "drizzle-orm";
+import { getAdminStoreType } from "@/actions/admin-store";
 
 export default async function AdminDashboardPage() {
+  const storeType = await getAdminStoreType();
   const now = new Date();
   const thirtyDaysAgo = new Date(now);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -12,7 +14,7 @@ export default async function AdminDashboardPage() {
 
   const [totalProducts, totalOrders, revenue30d, orders7d, recentOrders] =
     await Promise.all([
-      db.select({ count: sql<number>`count(*)::int` }).from(products),
+      db.select({ count: sql<number>`count(*)::int` }).from(products).where(eq(products.storeType, storeType)),
       db.select({ count: sql<number>`count(*)::int` }).from(orders),
       db
         .select({
@@ -38,21 +40,26 @@ export default async function AdminDashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-8">Dashboard</h1>
+      <div className="flex items-center gap-4 mb-8">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <span className="px-2.5 py-1 text-xs font-medium bg-muted text-muted-foreground rounded-full capitalize">
+          Managing: {storeType}
+        </span>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
         <StatCard
-          title="Total Products"
+          title={`${storeType} Products`}
           value={totalProductsCount}
           href="/admin/products"
         />
         <StatCard
-          title="Total Orders"
+          title="Global Orders"
           value={totalOrdersCount}
           href="/admin/orders"
         />
-        <StatCard title="Revenue (30D)" value={`$${revenue30dValue.toFixed(2)}`} />
-        <StatCard title="Orders (7D)" value={orders7dCount} />
+        <StatCard title="Global Revenue (30D)" value={`$${revenue30dValue.toFixed(2)}`} />
+        <StatCard title="Global Orders (7D)" value={orders7dCount} />
       </div>
 
       <section>

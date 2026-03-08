@@ -56,13 +56,7 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
         .where(inArray(productColors.productId, productIds))
       : [];
 
-  const getStoreType = (categorySlug: string | null) => {
-    let current = allCats.find((c) => c.slug === categorySlug);
-    while (current && current.level !== "root" && current.parentId) {
-      current = allCats.find((c) => c.id === current?.parentId);
-    }
-    return current?.slug || "streetwear";
-  };
+
   const firstImageByProductId: Record<number, string> = {};
   for (const c of colorsList) {
     if (!firstImageByProductId[c.productId] && c.imageUrls?.[0]) {
@@ -184,11 +178,11 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
               const displayPrice = getProductDisplayPrice(product);
               const onSale = isProductOnSale(product);
               const percentOff = getProductDiscountPercent(product);
-              const storeType = getStoreType(product.categorySlug);
+              const itemStoreType = product.storeType || storeType;
               return (
                 <Link
                   key={product.id}
-                  href={`/${storeType}/product/${product.id}`}
+                  href={`/${itemStoreType}/product/${product.id}`}
                   className="flex-shrink-0 w-[220px] group"
                 >
                   <div className="aspect-[2/3] overflow-hidden mb-4 relative">

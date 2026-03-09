@@ -94,6 +94,9 @@ export function CheckoutForm({ cart }: CheckoutFormProps) {
     setPromoLoading(true);
     try {
       const result = await validatePromoCode(code, subtotal, shippingFee);
+      if ("error" in result) {
+        throw new Error(result.error);
+      }
       setAppliedPromo({ code: result.code, discountAmount: result.discountAmount });
       setPromoInput("");
       toast.success(`Promo code ${result.code} applied! -$${result.discountAmount.toFixed(2)}`);

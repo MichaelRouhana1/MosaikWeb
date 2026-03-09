@@ -97,16 +97,16 @@ export async function validatePromoCode(
   code: string,
   cartSubtotal: number,
   shippingFee: number = DEFAULT_SHIPPING_FEE
-): Promise<ValidatePromoResult> {
+): Promise<ValidatePromoResult | { success: false; error: string }> {
   const validatedCode = z.string().min(1).parse(code);
   const validatedCartSubtotal = z.number().min(0).parse(cartSubtotal);
   const validatedShippingFee = z.number().min(0).parse(shippingFee);
 
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headersList.get("x-real-ip") ?? "unknown";
-  const limit = checkValidatePromoLimit(ip);
+  const limit = await checkValidatePromoLimit(ip);
   if (!limit.allowed) {
-    throw new Error("Too many attempts. Please try again in a moment.");
+    return { success: false, error: "Too many requests. Please try again later." };
   }
   const result = await validateAndGetPromo(db, validatedCode, validatedCartSubtotal, validatedShippingFee);
   return {

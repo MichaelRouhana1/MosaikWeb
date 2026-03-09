@@ -41,13 +41,13 @@ const placeOrderSchema = z.object({
 export type CartItem = z.infer<typeof cartItemSchema>;
 export type PlaceOrderInput = z.infer<typeof placeOrderSchema>;
 
-export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId: number }> {
+export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId?: number; success?: boolean; error?: string }> {
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headersList.get("x-real-ip") ?? "unknown";
   const identifier = input.userId ?? input.guestEmail ?? ip;
-  const limit = checkPlaceOrderLimit(identifier);
+  const limit = await checkPlaceOrderLimit(identifier);
   if (!limit.allowed) {
-    throw new Error(`Too many orders. Please try again in ${Math.ceil(limit.retryAfterMs / 60000)} minute(s).`);
+    return { success: false, error: "Too many requests. Please try again later." };
   }
 
   const parseResult = placeOrderSchema.safeParse(input);

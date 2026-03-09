@@ -7,6 +7,8 @@ import { db } from "@/db";
 import { productCategories } from "@/db/schema";
 import { uploadProductImage } from "@/lib/uploadImages";
 import { auditLog } from "@/lib/audit";
+import { headers } from "next/headers";
+import { checkSensitiveOperationLimit } from "@/lib/rate-limit";
 
 export type ProductCategory = typeof productCategories.$inferSelect;
 
@@ -107,6 +109,13 @@ export async function createCategory(formData: FormData): Promise<{ success?: bo
     return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
   }
 
+  const headersList = await headers();
+  const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headersList.get("x-real-ip") ?? "unknown";
+  const limit = await checkSensitiveOperationLimit(`admin-category-create:${ip}`);
+  if (!limit.allowed) {
+    return { success: false, error: "Too many requests. Please try again later." };
+  }
+
   const { userId, sessionClaims } = await auth();
   if (sessionClaims?.metadata?.role !== "admin") {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "category.create" });
@@ -182,6 +191,13 @@ export async function updateCategory(
 
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
+  }
+
+  const headersList = await headers();
+  const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headersList.get("x-real-ip") ?? "unknown";
+  const limit = await checkSensitiveOperationLimit(`admin-category-update:${ip}`);
+  if (!limit.allowed) {
+    return { success: false, error: "Too many requests. Please try again later." };
   }
 
   const { userId, sessionClaims } = await auth();

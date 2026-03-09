@@ -142,7 +142,7 @@ export function ProductCard({
           {currentImage ? (
             <Image
               src={currentImage}
-              alt={product.name}
+              alt={product.description ? `${product.name} - ${product.description}` : product.name}
               fill
               className={`object-cover transition-opacity duration-200 ${isOutOfStock ? "opacity-70" : ""
                 }`}
@@ -320,7 +320,7 @@ export function ProductCard({
                     <span className="absolute inset-0 block rounded-full overflow-hidden bg-muted">
                       <Image
                         src={color.imageUrls[0]}
-                        alt=""
+                        alt={`${product.name} in ${color.name}`}
                         fill
                         className="object-cover"
 

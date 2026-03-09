@@ -62,9 +62,10 @@ export function AdminHeader({ onMenuClick, initialStore }: AdminHeaderProps) {
           <button
             onClick={() => toggleStore("streetwear")}
             disabled={isPending}
+            aria-label="Switch to streetwear store"
             className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-sm transition-all ${currentStore === "streetwear"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
               }`}
           >
             Streetwear
@@ -72,9 +73,10 @@ export function AdminHeader({ onMenuClick, initialStore }: AdminHeaderProps) {
           <button
             onClick={() => toggleStore("formal")}
             disabled={isPending}
+            aria-label="Switch to formal store"
             className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-sm transition-all ${currentStore === "formal"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
               }`}
           >
             Formal

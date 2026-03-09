@@ -45,6 +45,7 @@ export function CartClient({
 
   return (
     <div className="w-full max-w-[1400px] mx-auto px-6 py-12">
+      <h1 className="sr-only">Your Cart</h1>
       {/* Tabs */}
       <div className="flex gap-8 mb-12 border-b border-border">
         <button
@@ -97,7 +98,7 @@ export function CartClient({
                       {item.productImage ? (
                         <Image
                           src={item.productImage}
-                          alt={item.productName}
+                          alt={item.productColor ? `${item.productName} in ${item.productColor}` : item.productName}
                           fill
                           className="object-cover"
 

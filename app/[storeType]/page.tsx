@@ -72,6 +72,7 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
     return {
       id: p.id,
       name: p.name,
+      description: p.description,
       price: typeof p.price === "string" ? p.price : String(p.price),
       displayPrice: getProductDisplayPrice(p),
       onSale: isProductOnSale(p),

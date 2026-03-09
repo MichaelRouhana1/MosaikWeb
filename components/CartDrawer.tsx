@@ -107,7 +107,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                     {item.productImage ? (
                       <Image
                         src={item.productImage}
-                        alt={item.productName}
+                        alt={item.productColor ? `${item.productName} in ${item.productColor}` : item.productName}
                         fill
                         className="object-cover"
 

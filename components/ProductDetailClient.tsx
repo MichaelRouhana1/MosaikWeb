@@ -294,7 +294,7 @@ export function ProductDetailClient({
                         {src ? (
                           <Image
                             src={src}
-                            alt={product.name}
+                            alt={product.description ? `${product.name} - ${product.description}` : product.name}
                             fill
                             className="object-cover"
                             onError={() => handleImageError(idx)}
@@ -328,7 +328,7 @@ export function ProductDetailClient({
               {mainSrc ? (
                 <Image
                   src={mainSrc}
-                  alt={product.name}
+                  alt={product.description ? `${product.name} - ${product.description}` : product.name}
                   fill
                   className="object-cover"
                   onError={() => handleImageError(mainImageIndex)}
@@ -434,7 +434,7 @@ export function ProductDetailClient({
                           {!hasError && url ? (
                             <Image
                               src={url}
-                              alt=""
+                              alt={`Thumbnail image ${idx + 1} of ${product.name}`}
                               width={64}
                               height={80}
                               className="w-full h-full object-cover"
@@ -490,7 +490,7 @@ export function ProductDetailClient({
                         {imageUrls[lightboxIndex] && !imageErrors[lightboxIndex] ? (
                           <Image
                             src={imageUrls[lightboxIndex]}
-                            alt={product.name}
+                            alt={`Zoomed image ${lightboxIndex + 1} of ${product.name}`}
                             width={1200}
                             height={1600}
                             className={`object-contain select-none pointer-events-none ${lightboxZoomed ? "w-[110%] h-[110%]" : "max-w-full max-h-[85vh]"
@@ -577,7 +577,7 @@ export function ProductDetailClient({
                       {!hasError && url ? (
                         <Image
                           src={url}
-                          alt=""
+                          alt={`Thumbnail image ${position} of ${product.name}`}
                           fill
                           className="object-cover"
                           onError={() => handleImageError(urlIndex)}
@@ -649,7 +649,7 @@ export function ProductDetailClient({
             <div className="mt-4 aspect-square w-16 h-16 overflow-hidden border border-border">
               <Image
                 src={imageUrls[0]}
-                alt=""
+                alt={`Selected color ${selectedColor?.name ?? product.color ?? ''}`.trim()}
                 width={64}
                 height={64}
                 className="w-full h-full object-cover"

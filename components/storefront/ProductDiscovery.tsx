@@ -6,6 +6,7 @@ export interface DiscoverProduct {
     name: string;
     price: string;
     displayPrice: string;
+    description?: string | null;
     onSale: boolean;
     percentOff: number;
     storeType: string;
@@ -43,7 +44,7 @@ export function ProductDiscovery({ products, currentStoreType, fallbackImage }: 
                                     )}
                                     <Image
                                         src={imageUrl}
-                                        alt={product.name}
+                                        alt={product.description ? `${product.name} - ${product.description}` : product.name}
                                         fill
                                         className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
                                     />

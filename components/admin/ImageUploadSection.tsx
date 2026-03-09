@@ -1,0 +1,169 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import { useDropzone } from "react-dropzone";
+import { ImageCropModal } from "@/components/ImageCropModal";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+export interface ColorEntry {
+    id: string;
+    name: string;
+    hexCode: string;
+    imageFiles: File[];
+    stockBySize: Record<string, number>;
+}
+
+interface ImageUploadSectionProps {
+    color: ColorEntry;
+    onUpdate: (updates: Partial<Omit<ColorEntry, "id">>) => void;
+    onRemove: () => void;
+    onAddFiles: (files: File[]) => void;
+    onRemoveFile: (index: number) => void;
+    canRemove: boolean;
+}
+
+export function ImageUploadSection({
+    color,
+    onUpdate,
+    onRemove,
+    onAddFiles,
+    onRemoveFile,
+    canRemove,
+}: ImageUploadSectionProps) {
+    const [cropPending, setCropPending] = useState<{ file: File; objectUrl: string } | null>(null);
+    const cropQueueRef = useRef<File[]>([]);
+
+    const processNextInQueue = useCallback(() => {
+        const next = cropQueueRef.current.shift();
+        if (!next) {
+            setCropPending(null);
+            return;
+        }
+        setCropPending({ file: next, objectUrl: URL.createObjectURL(next) });
+    }, []);
+
+    const handleCropComplete = useCallback(
+        (blob: Blob) => {
+            const current = cropPending;
+            if (!current) return;
+            URL.revokeObjectURL(current.objectUrl);
+            setCropPending(null);
+            const file = new File([blob], current.file.name.replace(/\.[^.]+$/, ".jpg"), {
+                type: "image/jpeg",
+            });
+            onAddFiles([file]);
+            processNextInQueue();
+        },
+        [cropPending, onAddFiles, processNextInQueue]
+    );
+
+    const handleCropCancel = useCallback(() => {
+        if (cropPending) {
+            URL.revokeObjectURL(cropPending.objectUrl);
+            setCropPending(null);
+        }
+        processNextInQueue();
+    }, [cropPending, processNextInQueue]);
+
+    const onDrop = useCallback(
+        (acceptedFiles: File[]) => {
+            if (acceptedFiles.length === 0) return;
+            cropQueueRef.current.push(...acceptedFiles);
+            if (!cropPending) processNextInQueue();
+        },
+        [cropPending, processNextInQueue]
+    );
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp", ".gif"] },
+        maxSize: 5 * 1024 * 1024,
+    });
+
+    return (
+        <div className="border border-border rounded-lg p-4 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                        <Label>Color name</Label>
+                        <Input
+                            placeholder="e.g. Midnight Black"
+                            value={color.name}
+                            onChange={(e) => onUpdate({ name: e.target.value })}
+                            required
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label>Hex code</Label>
+                        <div className="flex gap-2 items-center">
+                            <input
+                                type="color"
+                                value={color.hexCode}
+                                onChange={(e) => onUpdate({ hexCode: e.target.value })}
+                                className="h-10 w-14 cursor-pointer rounded border border-input bg-transparent p-1"
+                            />
+                            <Input
+                                value={color.hexCode}
+                                onChange={(e) => onUpdate({ hexCode: e.target.value })}
+                                placeholder="#000000"
+                                className="font-mono"
+                            />
+                        </div>
+                    </div>
+                </div>
+                {canRemove && (
+                    <Button type="button" variant="ghost" size="sm" onClick={onRemove} className="text-destructive hover:text-destructive">
+                        Remove
+                    </Button>
+                )}
+            </div>
+            <div className="space-y-1.5">
+                <Label>Images (this color only)</Label>
+                <div
+                    {...getRootProps()}
+                    className={cn(
+                        "border-input flex min-h-[100px] cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed p-4 transition-colors",
+                        isDragActive ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                    )}
+                >
+                    <input {...getInputProps()} />
+                    <p className="text-center text-sm text-muted-foreground">
+                        {isDragActive ? "Drop images here…" : "Drag & drop or click to add images"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">PNG, JPG, WebP, GIF up to 5MB</p>
+                </div>
+                {color.imageFiles.length > 0 && (
+                    <ul className="mt-2 flex flex-wrap gap-2">
+                        {color.imageFiles.map((file, i) => (
+                            <li
+                                key={i}
+                                className="flex items-center gap-2 rounded bg-muted px-2 py-1 text-xs"
+                            >
+                                {file.name}
+                                <button
+                                    type="button"
+                                    onClick={() => onRemoveFile(i)}
+                                    className="text-destructive hover:underline"
+                                >
+                                    ×
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+            {cropPending && (
+                <ImageCropModal
+                    imageSrc={cropPending.objectUrl}
+                    onComplete={handleCropComplete}
+                    onCancel={handleCropCancel}
+                    aspect={2 / 3}
+                    title="Crop image (2:3 product ratio)"
+                />
+            )}
+        </div>
+    );
+}

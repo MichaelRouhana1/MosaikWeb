@@ -14,19 +14,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ImageCropModal } from "@/components/ImageCropModal";
-import { cn } from "@/lib/utils";
+import { CategorySelect } from "@/components/admin/CategorySelect";
+import { PriceInput } from "@/components/admin/PriceInput";
+import { StoreTypeSelect } from "@/components/admin/StoreTypeSelect";
+import { ImageUploadSection, type ColorEntry } from "@/components/admin/ImageUploadSection";
 import type { ProductCategory } from "@/actions/categories";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
-
-interface ColorEntry {
-  id: string;
-  name: string;
-  hexCode: string;
-  imageFiles: File[];
-  stockBySize: Record<string, number>;
-}
 
 export function CreateProductForm({
   categories,
@@ -149,48 +143,9 @@ export function CreateProductForm({
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="price">Price</Label>
-              <Input
-                id="price"
-                name="price"
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                placeholder="0.00"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <select
-                id="category"
-                name="category"
-                required
-                className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Select category</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.slug}>
-                    {cat.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="storeType">Store Type</Label>
-              <select
-                id="storeType"
-                name="storeType"
-                required
-                defaultValue={initialStoreType}
-                className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="both">Both</option>
-                <option value="streetwear">Streetwear</option>
-                <option value="formal">Formal</option>
-              </select>
-            </div>
+            <PriceInput />
+            <CategorySelect categories={categories} />
+            <StoreTypeSelect initialStoreType={initialStoreType} />
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -221,10 +176,9 @@ export function CreateProductForm({
             </div>
 
             {colors.map((color) => (
-              <ColorRow
+              <ImageUploadSection
                 key={color.id}
                 color={color}
-                sizes={SIZES}
                 onUpdate={(updates) => updateColor(color.id, updates)}
                 onRemove={() => removeColor(color.id)}
                 onAddFiles={(files) => addFilesToColor(color.id, files)}
@@ -313,155 +267,4 @@ export function CreateProductForm({
   );
 }
 
-interface ColorRowProps {
-  color: ColorEntry;
-  sizes: readonly string[];
-  onUpdate: (updates: Partial<Omit<ColorEntry, "id">>) => void;
-  onRemove: () => void;
-  onAddFiles: (files: File[]) => void;
-  onRemoveFile: (index: number) => void;
-  canRemove: boolean;
-}
 
-function ColorRow({
-  color,
-  onUpdate,
-  onRemove,
-  onAddFiles,
-  onRemoveFile,
-  canRemove,
-}: ColorRowProps) {
-  const [cropPending, setCropPending] = useState<{ file: File; objectUrl: string } | null>(null);
-  const cropQueueRef = useRef<File[]>([]);
-
-  const processNextInQueue = useCallback(() => {
-    const next = cropQueueRef.current.shift();
-    if (!next) {
-      setCropPending(null);
-      return;
-    }
-    setCropPending({ file: next, objectUrl: URL.createObjectURL(next) });
-  }, []);
-
-  const handleCropComplete = useCallback(
-    (blob: Blob) => {
-      const current = cropPending;
-      if (!current) return;
-      URL.revokeObjectURL(current.objectUrl);
-      setCropPending(null);
-      const file = new File([blob], current.file.name.replace(/\.[^.]+$/, ".jpg"), {
-        type: "image/jpeg",
-      });
-      onAddFiles([file]);
-      processNextInQueue();
-    },
-    [cropPending, onAddFiles, processNextInQueue]
-  );
-
-  const handleCropCancel = useCallback(() => {
-    if (cropPending) {
-      URL.revokeObjectURL(cropPending.objectUrl);
-      setCropPending(null);
-    }
-    processNextInQueue();
-  }, [cropPending, processNextInQueue]);
-
-  const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      if (acceptedFiles.length === 0) return;
-      cropQueueRef.current.push(...acceptedFiles);
-      if (!cropPending) processNextInQueue();
-    },
-    [cropPending, processNextInQueue]
-  );
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp", ".gif"] },
-    maxSize: 5 * 1024 * 1024,
-  });
-
-  return (
-    <div className="border border-border rounded-lg p-4 space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Color name</Label>
-            <Input
-              placeholder="e.g. Midnight Black"
-              value={color.name}
-              onChange={(e) => onUpdate({ name: e.target.value })}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Hex code</Label>
-            <div className="flex gap-2 items-center">
-              <input
-                type="color"
-                value={color.hexCode}
-                onChange={(e) => onUpdate({ hexCode: e.target.value })}
-                className="h-10 w-14 cursor-pointer rounded border border-input bg-transparent p-1"
-              />
-              <Input
-                value={color.hexCode}
-                onChange={(e) => onUpdate({ hexCode: e.target.value })}
-                placeholder="#000000"
-                className="font-mono"
-              />
-            </div>
-          </div>
-        </div>
-        {canRemove && (
-          <Button type="button" variant="ghost" size="sm" onClick={onRemove} className="text-destructive hover:text-destructive">
-            Remove
-          </Button>
-        )}
-      </div>
-      <div className="space-y-1.5">
-        <Label>Images (this color only)</Label>
-        <div
-          {...getRootProps()}
-          className={cn(
-            "border-input flex min-h-[100px] cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed p-4 transition-colors",
-            isDragActive ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-          )}
-        >
-          <input {...getInputProps()} />
-          <p className="text-center text-sm text-muted-foreground">
-            {isDragActive ? "Drop images here…" : "Drag & drop or click to add images"}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">PNG, JPG, WebP, GIF up to 5MB</p>
-        </div>
-        {color.imageFiles.length > 0 && (
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {color.imageFiles.map((file, i) => (
-              <li
-                key={i}
-                className="flex items-center gap-2 rounded bg-muted px-2 py-1 text-xs"
-              >
-                {file.name}
-                <button
-                  type="button"
-                  onClick={() => onRemoveFile(i)}
-                  className="text-destructive hover:underline"
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      {cropPending && (
-        <ImageCropModal
-          imageSrc={cropPending.objectUrl}
-          onComplete={handleCropComplete}
-          onCancel={handleCropCancel}
-          aspect={2 / 3}
-          title="Crop image (2:3 product ratio)"
-        />
-      )}
-    </div>
-  );
-}

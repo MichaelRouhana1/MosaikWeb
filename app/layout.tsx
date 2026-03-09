@@ -32,7 +32,7 @@ export default async function RootLayout({
   const nonce = headersList.get("x-nonce") || undefined;
 
   return (
-    <ClerkProvider nonce={nonce}>
+    <ClerkProvider dynamic nonce={nonce}>
       <html lang="en" suppressHydrationWarning>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}

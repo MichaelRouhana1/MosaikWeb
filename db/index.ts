@@ -5,5 +5,10 @@ import * as schema from "./schema";
 const connectionString = process.env.DATABASE_URL!;
 
 // For query purposes
-const queryClient = postgres(connectionString);
+const queryClient = postgres(connectionString, {
+    max: 10,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    prepare: false,
+});
 export const db = drizzle(queryClient, { schema });

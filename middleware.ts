@@ -35,14 +35,14 @@ export default clerkMiddleware(async (auth, req) => {
     }
   }
 
-  if (isAdminRoute(req) || req.nextUrl.pathname.startsWith("/api")) {
+  if (isAdminRoute(req) || req.nextUrl.pathname.startsWith("/api/upload")) {
     if (globalAdminLimiter) {
       const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? "127.0.0.1";
       try {
         const { success } = await globalAdminLimiter.limit(ip);
         if (!success) {
           return new NextResponse(
-            JSON.stringify({ success: false, error: "Too many requests. Please try again later." }),
+            JSON.stringify({ success: false, error: "Too many requests. Please wait before trying again." }),
             { status: 429, headers: { "Content-Type": "application/json" } }
           );
         }

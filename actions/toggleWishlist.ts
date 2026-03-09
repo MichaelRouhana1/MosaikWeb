@@ -19,7 +19,7 @@ export async function toggleWishlist(productId: number): Promise<{
   }
   const limit = await checkToggleWishlistLimit(userId);
   if (!limit.allowed) {
-    return { success: false, error: "Too many requests. Please try again later." };
+    return { success: false, error: "Too many requests. Please wait before trying again." };
   }
 
   const existing = await db

@@ -47,7 +47,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId?: nu
   const identifier = input.userId ?? input.guestEmail ?? ip;
   const limit = await checkPlaceOrderLimit(identifier);
   if (!limit.allowed) {
-    return { success: false, error: "Too many requests. Please try again later." };
+    return { success: false, error: "Too many requests. Please wait before trying again." };
   }
 
   const parseResult = placeOrderSchema.safeParse(input);

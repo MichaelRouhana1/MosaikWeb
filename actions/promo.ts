@@ -106,7 +106,7 @@ export async function validatePromoCode(
   const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headersList.get("x-real-ip") ?? "unknown";
   const limit = await checkValidatePromoLimit(ip);
   if (!limit.allowed) {
-    return { success: false, error: "Too many requests. Please try again later." };
+    return { success: false, error: "Too many requests. Please wait before trying again." };
   }
   const result = await validateAndGetPromo(db, validatedCode, validatedCartSubtotal, validatedShippingFee);
   return {

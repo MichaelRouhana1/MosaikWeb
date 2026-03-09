@@ -64,19 +64,19 @@ export function EditProductForm({
     colors.length > 0
       ? colors.map((c) => toColorEntry(c, variants))
       : [
-          {
-            id: crypto.randomUUID(),
-            name: (product as { color?: string | null }).color ?? "Default",
-            hexCode: "#000000",
-            imageUrls: (product.images ?? []) as string[],
-            imageFiles: [],
-            stockBySize: SIZES.reduce<Record<string, number>>((acc, s) => {
-              const v = variants.find((x) => x.size === s);
-              acc[s] = v?.stock ?? 0;
-              return acc;
-            }, {}),
-          },
-        ]
+        {
+          id: crypto.randomUUID(),
+          name: (product as { color?: string | null }).color ?? "Default",
+          hexCode: "#000000",
+          imageUrls: (product.images ?? []) as string[],
+          imageFiles: [],
+          stockBySize: SIZES.reduce<Record<string, number>>((acc, s) => {
+            const v = variants.find((x) => x.size === s);
+            acc[s] = v?.stock ?? 0;
+            return acc;
+          }, {}),
+        },
+      ]
   );
   const [state, setState] = useState<{ error?: string } | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -485,7 +485,7 @@ function EditColorRow({
                   fill
                   className="object-cover"
                   sizes="80px"
-                  unoptimized
+
                 />
                 <button
                   type="button"

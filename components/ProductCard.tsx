@@ -12,7 +12,6 @@ import type { Product } from "@/db/schema";
 import type { ProductVariant, ProductColor } from "@/db/schema";
 
 const DEFAULT_SIZES = ["XS", "S", "M", "L", "XL"];
-const PEXELS_PREFIX = "https://images.pexels.com/";
 
 interface ProductCardProps {
   product: Product;
@@ -148,7 +147,7 @@ export function ProductCard({
               className={`object-cover transition-opacity duration-200 ${isOutOfStock ? "opacity-70" : ""
                 }`}
               sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-              unoptimized={!currentImage.startsWith(PEXELS_PREFIX)}
+
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -260,8 +259,8 @@ export function ProductCard({
                       onClick={(e) => handleSizeClick(e, size)}
                       disabled={!inStock}
                       className={`px-3 py-1.5 text-xs font-medium uppercase tracking-widest transition-colors ${inStock
-                          ? "border border-foreground text-foreground hover:bg-foreground hover:text-primary-foreground"
-                          : "border border-muted-foreground/40 text-muted-foreground/60 opacity-60 cursor-not-allowed line-through"
+                        ? "border border-foreground text-foreground hover:bg-foreground hover:text-primary-foreground"
+                        : "border border-muted-foreground/40 text-muted-foreground/60 opacity-60 cursor-not-allowed line-through"
                         }`}
                     >
                       {size}
@@ -324,7 +323,7 @@ export function ProductCard({
                         alt=""
                         fill
                         className="object-cover"
-                        unoptimized={!color.imageUrls[0].startsWith(PEXELS_PREFIX)}
+
                         sizes="20px"
                       />
                     </span>

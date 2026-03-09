@@ -7,6 +7,7 @@ import {
   integer,
   timestamp,
   pgEnum,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -59,7 +60,9 @@ export const productCategories = pgTable("product_categories", {
   level: categoryLevelEnum("level").notNull().default("main"),
   storeType: storeTypeEnum("store_type").notNull().default("streetwear"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("product_categories_store_type_idx").on(t.storeType),
+]);
 
 // Products - category_slug references product_categories.slug
 export const products = pgTable("products", {
@@ -76,7 +79,9 @@ export const products = pgTable("products", {
   color: text("color"),
   isVisible: boolean("is_visible").notNull().default(true),
   storeType: storeTypeEnum("store_type").notNull().default("streetwear"),
-});
+}, (t) => [
+  index("products_store_type_idx").on(t.storeType),
+]);
 
 // Product colors - each color has its own image gallery
 export const productColors = pgTable("product_colors", {
@@ -236,7 +241,9 @@ export const heroImages = pgTable("hero_images", {
   isActive: boolean("is_active").notNull().default(true),
   storeType: storeTypeEnum("store_type").notNull().default("streetwear"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("hero_images_store_type_idx").on(t.storeType),
+]);
 
 // Wishlists
 export const wishlists = pgTable("wishlists", {

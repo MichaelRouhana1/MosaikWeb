@@ -5,11 +5,13 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { wishlists } from "@/db/schema";
 import { checkToggleWishlistLimit } from "@/lib/rate-limit";
+import { z } from "zod";
 
 export async function toggleWishlist(productId: number): Promise<{
   error?: string;
   inWishlist?: boolean;
 }> {
+  const validProductId = z.number().int().positive().parse(productId);
   const { userId } = await auth();
   if (!userId) {
     return { error: "Sign in to add to favorites" };
@@ -25,7 +27,7 @@ export async function toggleWishlist(productId: number): Promise<{
     .where(
       and(
         eq(wishlists.userId, userId),
-        eq(wishlists.productId, productId)
+        eq(wishlists.productId, validProductId)
       )
     )
     .limit(1);
@@ -36,7 +38,7 @@ export async function toggleWishlist(productId: number): Promise<{
       .where(
         and(
           eq(wishlists.userId, userId),
-          eq(wishlists.productId, productId)
+          eq(wishlists.productId, validProductId)
         )
       );
     return { inWishlist: false };
@@ -44,7 +46,7 @@ export async function toggleWishlist(productId: number): Promise<{
 
   await db.insert(wishlists).values({
     userId,
-    productId,
+    productId: validProductId,
   });
   return { inWishlist: true };
 }

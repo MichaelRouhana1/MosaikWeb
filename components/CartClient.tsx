@@ -11,7 +11,6 @@ import type { Product } from "@/db/schema";
 import type { ProductVariant } from "@/db/schema";
 
 const FREE_DELIVERY_THRESHOLD = 100;
-const PEXELS_PREFIX = "https://images.pexels.com/";
 
 type Tab = "basket" | "favorites";
 
@@ -51,22 +50,20 @@ export function CartClient({
         <button
           type="button"
           onClick={() => setActiveTab("basket")}
-          className={`text-sm font-medium uppercase tracking-widest pb-4 -mb-px transition-colors ${
-            activeTab === "basket"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
+          className={`text-sm font-medium uppercase tracking-widest pb-4 -mb-px transition-colors ${activeTab === "basket"
+            ? "text-foreground border-b-2 border-foreground"
+            : "text-muted-foreground hover:text-foreground"
+            }`}
         >
           Basket ({items.length})
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("favorites")}
-          className={`text-sm font-medium uppercase tracking-widest pb-4 -mb-px transition-colors ${
-            activeTab === "favorites"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
+          className={`text-sm font-medium uppercase tracking-widest pb-4 -mb-px transition-colors ${activeTab === "favorites"
+            ? "text-foreground border-b-2 border-foreground"
+            : "text-muted-foreground hover:text-foreground"
+            }`}
         >
           Favourites ({isSignedIn ? wishlistProductIds.length : 0})
         </button>
@@ -103,7 +100,7 @@ export function CartClient({
                           alt={item.productName}
                           fill
                           className="object-cover"
-                          unoptimized={!item.productImage.startsWith(PEXELS_PREFIX)}
+
                           sizes="(max-width: 768px) 50vw, 25vw"
                         />
                       ) : (

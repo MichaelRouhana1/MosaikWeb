@@ -75,7 +75,7 @@ export function ProductImageUpload({
               width={96}
               height={144}
               className="w-full h-full object-cover"
-              unoptimized
+
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">

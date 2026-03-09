@@ -212,7 +212,7 @@ export function LookAdminClient({ items: initialItems, sectionVisible: initialSe
                   alt={item.label}
                   fill
                   className="object-cover"
-                  unoptimized
+
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                 />
               </div>

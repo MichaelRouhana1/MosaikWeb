@@ -47,7 +47,7 @@ export function HeroCarousel({ images }: HeroCarouselProps) {
           fill
           className="object-cover"
           priority
-          unoptimized
+
           sizes="100vw"
         />
 

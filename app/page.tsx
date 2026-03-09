@@ -26,7 +26,7 @@ export default function RootHomePage() {
           fill
           className="object-cover transition-transform duration-[2s] ease-out md:group-hover:scale-105"
           priority
-          unoptimized
+
         />
         {/* Dark overlay for contrast */}
         <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors duration-[800ms]" />
@@ -52,7 +52,7 @@ export default function RootHomePage() {
           fill
           className="object-cover transition-transform duration-[2s] ease-out md:group-hover:scale-105"
           priority
-          unoptimized
+
         />
         {/* Dark overlay for contrast */}
         <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors duration-[800ms]" />

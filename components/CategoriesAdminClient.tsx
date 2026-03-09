@@ -46,7 +46,7 @@ export function CategoriesAdminClient({ categories: initialCategories, initialSt
     setEditingId(null);
     setAdding(false);
     setError(null);
-  }, []);
+  }, [initialStoreType]);
 
   const startAdd = () => {
     resetForm();
@@ -58,7 +58,7 @@ export function CategoriesAdminClient({ categories: initialCategories, initialSt
     setFormSlug(cat.slug);
     setFormLabel(cat.label);
     setFormShowOnHome(cat.showOnHome);
-    // @ts-ignore - storeType was added to schema but TypeScript might not know it
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const catStoreType = (cat as any).storeType || "both";
     setFormStoreType(catStoreType);
     setEditingId(cat.id);
@@ -156,7 +156,7 @@ export function CategoriesAdminClient({ categories: initialCategories, initialSt
             <select
               id="storeType"
               value={formStoreType}
-              onChange={(e) => setFormStoreType(e.target.value as any)}
+              onChange={(e) => setFormStoreType(e.target.value as "streetwear" | "formal" | "both")}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
             >
               <option value="streetwear">Streetwear</option>
@@ -239,7 +239,7 @@ export function CategoriesAdminClient({ categories: initialCategories, initialSt
                         alt={cat.label}
                         fill
                         className="object-cover"
-                        unoptimized={cat.image.startsWith("http")}
+
                         sizes="48px"
                       />
                     ) : (
@@ -247,6 +247,7 @@ export function CategoriesAdminClient({ categories: initialCategories, initialSt
                     )}
                   </div>
                 </td>
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 <td className="p-4 capitalize">{(cat as any).storeType || "streetwear"}</td>
                 <td className="p-4 font-mono text-muted-foreground">{cat.slug}</td>
                 <td className="p-4">{cat.label}</td>

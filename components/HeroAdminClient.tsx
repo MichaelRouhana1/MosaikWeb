@@ -85,7 +85,7 @@ export function HeroAdminClient({ images: initialImages, initialStoreType }: Her
     [router]
   );
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps } = useDropzone({
     onDrop,
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp", ".gif"] },
     maxSize: 5 * 1024 * 1024,
@@ -140,7 +140,7 @@ export function HeroAdminClient({ images: initialImages, initialStoreType }: Her
                   alt={img.altText ?? "Hero slide"}
                   fill
                   className="object-cover"
-                  unoptimized
+
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 />
               </div>

@@ -7,8 +7,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 
-const PEXELS_PREFIX = "https://images.pexels.com/";
-
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -44,17 +42,15 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         tabIndex={0}
         onClick={onClose}
         onKeyDown={(e) => e.key === "Escape" && onClose()}
-        className={`fixed inset-0 bg-black/60 z-[9998] transition-opacity duration-300 ${
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
+        className={`fixed inset-0 bg-black/60 z-[9998] transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
         aria-hidden={!isOpen}
       />
 
       {/* Drawer - fixed width, rendered via portal to avoid parent layout issues */}
       <aside
-        className={`fixed top-0 right-0 h-full w-[min(100vw,28rem)] min-w-[320px] flex flex-col bg-card text-card-foreground shadow-2xl z-[9999] transition-transform duration-300 ease-out ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
+        className={`fixed top-0 right-0 h-full w-[min(100vw,28rem)] min-w-[320px] flex flex-col bg-card text-card-foreground shadow-2xl z-[9999] transition-transform duration-300 ease-out ${isOpen ? "translate-x-0" : "translate-x-full"
+          }`}
         style={{ boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" }}
       >
         <div className="flex items-center justify-between p-6 border-b border-border">
@@ -114,7 +110,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                         alt={item.productName}
                         fill
                         className="object-cover"
-                        unoptimized={!item.productImage.startsWith(PEXELS_PREFIX)}
+
                         sizes="80px"
                       />
                     ) : (

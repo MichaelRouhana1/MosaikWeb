@@ -2,16 +2,18 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { asc, eq, inArray, and } from "drizzle-orm";
+import { asc, eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { heroImages } from "@/db/schema";
 import { uploadHeroImage } from "@/lib/uploadImages";
 import { auditLog } from "@/lib/audit";
+import { z } from "zod";
 
 export async function getHeroImages(storeType?: string) {
   const conditions = [eq(heroImages.isActive, true)];
   if (storeType) {
-    conditions.push(eq(heroImages.storeType, storeType as "streetwear" | "formal"));
+    const validatedStore = z.enum(["streetwear", "formal"]).parse(storeType);
+    conditions.push(eq(heroImages.storeType, validatedStore));
   }
   return db
     .select()
@@ -39,12 +41,16 @@ export async function addHeroImage(imageUrl: string, altText?: string, storeType
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "hero.add" });
     redirect("/");
   }
+  const validatedStore = z.enum(["streetwear", "formal", "both"]).parse(storeType);
+  const validatedUrl = z.string().url().parse(imageUrl);
+  const validatedAlt = altText ? z.string().parse(altText) : null;
+
   const [image] = await db
     .insert(heroImages)
     .values({
-      imageUrl,
-      altText: altText ?? null,
-      storeType,
+      imageUrl: validatedUrl,
+      altText: validatedAlt,
+      storeType: validatedStore,
     })
     .returning();
   if (image) auditLog({ userId: userId!, action: "hero.add", target: String(image.id) });
@@ -57,8 +63,9 @@ export async function deleteHeroImage(id: number) {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "hero.delete" });
     redirect("/");
   }
-  await db.delete(heroImages).where(eq(heroImages.id, id));
-  auditLog({ userId: userId!, action: "hero.delete", target: String(id) });
+  const validId = z.number().int().positive().parse(id);
+  await db.delete(heroImages).where(eq(heroImages.id, validId));
+  auditLog({ userId: userId!, action: "hero.delete", target: String(validId) });
 }
 
 /** Uploads a hero image file and adds it to the database. Admin only. */
@@ -67,13 +74,22 @@ export async function addHeroImageFromFile(formData: FormData): Promise<{ error?
   if (sessionClaims?.metadata?.role !== "admin") redirect("/");
 
   const file = formData.get("image") as File | null;
-  const storeType = (formData.get("storeType") as "streetwear" | "formal" | "both") || "both";
+  const storeTypeRaw = formData.get("storeType")?.toString() || "both";
+  const storeType = z.enum(["streetwear", "formal", "both"]).parse(storeTypeRaw);
   if (!file?.size) return { error: "No image provided" };
 
   const filename = `hero-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const result = await uploadHeroImage(file, filename);
   if (result.error) return { error: result.error };
 
-  await addHeroImage(result.url, undefined, storeType);
+  const [image] = await db
+    .insert(heroImages)
+    .values({
+      imageUrl: result.url,
+      altText: null,
+      storeType,
+    })
+    .returning();
+  if (image) auditLog({ userId: sessionClaims.sub ?? "", action: "hero.add", target: String(image.id) });
   return {};
 }

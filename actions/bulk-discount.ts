@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { products } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { auditLog } from "@/lib/audit";
+import { z } from "zod";
 
 function parsePrice(price: string | null | undefined): number {
   if (price == null) return 0;
@@ -32,13 +33,20 @@ export async function applyBulkDiscount(
   value: number,
   options?: { saleStartsAt?: Date | string | null; saleEndsAt?: Date | string | null }
 ) {
+  const schema = z.object({
+    productIds: z.array(z.number().int().positive()),
+    discountType: z.enum(["PERCENTAGE", "FIXED"]),
+    value: z.number().positive(),
+  });
+  const parsed = schema.parse({ productIds, discountType, value });
+
   const { userId, sessionClaims } = await auth();
   if (sessionClaims?.metadata?.role !== "admin") {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "bulk_discount.apply" });
     redirect("/");
   }
 
-  if (productIds.length === 0) return;
+  if (parsed.productIds.length === 0) return;
 
   const saleStartsAt = options?.saleStartsAt
     ? new Date(options.saleStartsAt)
@@ -80,20 +88,21 @@ export async function applyBulkDiscount(
     }
   });
 
-  auditLog({ userId: userId!, action: "bulk_discount.apply", target: productIds.length.toString(), details: { discountType, value, count: productIds.length } });
+  auditLog({ userId: userId!, action: "bulk_discount.apply", target: parsed.productIds.length.toString(), details: { discountType: parsed.discountType, value: parsed.value, count: parsed.productIds.length } });
   revalidatePath("/admin/products");
   revalidatePath("/shop");
   revalidatePath("/");
 }
 
 export async function removeBulkDiscount(productIds: number[]) {
+  const parsedIds = z.array(z.number().int().positive()).parse(productIds);
   const { userId, sessionClaims } = await auth();
   if (sessionClaims?.metadata?.role !== "admin") {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "bulk_discount.remove" });
     redirect("/");
   }
 
-  if (productIds.length === 0) return;
+  if (parsedIds.length === 0) return;
 
   await db
     .update(products)
@@ -103,9 +112,9 @@ export async function removeBulkDiscount(productIds: number[]) {
       saleEndsAt: null,
       isSaleActive: true,
     })
-    .where(inArray(products.id, productIds));
+    .where(inArray(products.id, parsedIds));
 
-  auditLog({ userId: userId!, action: "bulk_discount.remove", target: productIds.length.toString(), details: { count: productIds.length } });
+  auditLog({ userId: userId!, action: "bulk_discount.remove", target: parsedIds.length.toString(), details: { count: parsedIds.length } });
   revalidatePath("/admin/products");
   revalidatePath("/shop");
   revalidatePath("/");

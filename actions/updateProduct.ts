@@ -8,6 +8,7 @@ import { products, productVariants, productColors } from "@/db/schema";
 import { uploadProductImage } from "@/lib/uploadImages";
 import { getValidCategorySlugs } from "@/actions/categories";
 import { auditLog } from "@/lib/audit";
+import { z } from "zod";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
@@ -21,20 +22,36 @@ export async function updateProduct(
     redirect("/");
   }
 
-  const name = (formData.get("name") as string)?.trim();
-  const description = (formData.get("description") as string)?.trim() || null;
-  const price = formData.get("price") as string;
-  const categorySlug = formData.get("category") as string;
-  const isVisible = formData.get("isVisible") === "true";
-  const colorCount = parseInt(String(formData.get("color_count") ?? "0"), 10);
+  const validProductId = z.number().int().positive().parse(productId);
 
-  if (!name?.trim()) return { error: "Name is required" };
-  if (!price || isNaN(parseFloat(price))) return { error: "Valid price is required" };
+  const productSchema = z.object({
+    name: z.string().min(1, "Name is required").trim(),
+    description: z.string().trim().nullable().optional(),
+    price: z.string().min(1).regex(/^\d+(\.\d{1,2})?$/, "Valid price is required"),
+    categorySlug: z.string().min(1),
+    isVisible: z.boolean(),
+    color_count: z.number().int().min(1, "Add at least one color"),
+  });
+
+  const parsed = productSchema.safeParse({
+    name: formData.get("name"),
+    description: formData.get("description") || null,
+    price: formData.get("price"),
+    categorySlug: formData.get("category"),
+    isVisible: formData.get("isVisible") === "true",
+    color_count: parseInt(String(formData.get("color_count") ?? "0"), 10),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "Validation failed" };
+  }
+
+  const { name, description, price, categorySlug, isVisible, color_count: colorCount } = parsed.data;
+
   const validSlugs = await getValidCategorySlugs();
   if (!validSlugs.includes(categorySlug)) {
     return { error: "Invalid category" };
   }
-  if (colorCount < 1) return { error: "Add at least one color" };
 
   type ColorEntry = {
     existingId: number | null;
@@ -100,12 +117,12 @@ export async function updateProduct(
         color: colorEntries[0]?.name ?? null,
         isVisible,
       })
-      .where(eq(products.id, productId));
+      .where(eq(products.id, validProductId));
 
     const existingColors = await tx
       .select()
       .from(productColors)
-      .where(eq(productColors.productId, productId));
+      .where(eq(productColors.productId, validProductId));
 
     const colorIds: number[] = [];
     for (let i = 0; i < colorEntries.length; i++) {
@@ -127,7 +144,7 @@ export async function updateProduct(
         const [inserted] = await tx
           .insert(productColors)
           .values({
-            productId,
+            productId: validProductId,
             name: entry.name,
             hexCode: entry.hexCode,
             imageUrls,
@@ -147,7 +164,7 @@ export async function updateProduct(
     }
 
     // Delete all variants for this product and re-insert (avoids duplicates/orphans when colors change)
-    await tx.delete(productVariants).where(eq(productVariants.productId, productId));
+    await tx.delete(productVariants).where(eq(productVariants.productId, validProductId));
 
     for (let i = 0; i < colorEntries.length; i++) {
       const colorId = colorIds[i];
@@ -156,7 +173,7 @@ export async function updateProduct(
       for (const size of SIZES) {
         const stock = stockBySize[size] ?? 0;
         await tx.insert(productVariants).values({
-          productId,
+          productId: validProductId,
           colorId,
           size,
           stock,
@@ -165,6 +182,6 @@ export async function updateProduct(
     }
   });
 
-  auditLog({ userId, action: "product.update", target: String(productId), details: { name } });
+  auditLog({ userId, action: "product.update", target: String(validProductId), details: { name } });
   return {};
 }

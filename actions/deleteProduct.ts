@@ -1,5 +1,7 @@
 "use server";
 
+import { z } from "zod";
+
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
@@ -14,6 +16,8 @@ export async function deleteProduct(productId: number): Promise<void> {
     redirect("/");
   }
 
-  await db.delete(products).where(eq(products.id, productId));
-  auditLog({ userId, action: "product.delete", target: String(productId) });
+  const id = z.number().int().positive().parse(productId);
+
+  await db.delete(products).where(eq(products.id, id));
+  auditLog({ userId, action: "product.delete", target: String(id) });
 }

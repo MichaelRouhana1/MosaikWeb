@@ -10,6 +10,17 @@ import { auditLog } from "@/lib/audit";
 
 export type ProductCategory = typeof productCategories.$inferSelect;
 
+import { z } from "zod";
+
+const categorySchema = z.object({
+  slug: z.string().min(1).trim().toLowerCase().regex(/^[a-z0-9-]+$/),
+  label: z.string().min(1).trim(),
+  showOnHome: z.boolean(),
+  parentId: z.number().int().positive().nullable(),
+  level: z.enum(["root", "main", "sub"]).default("main"),
+  storeType: z.enum(["streetwear", "formal", "both"]).default("both"),
+});
+
 /** Valid slugs for shop filtering (from DB) */
 export async function getValidCategorySlugs(): Promise<string[]> {
   const cats = await db.select({ slug: productCategories.slug }).from(productCategories);
@@ -89,17 +100,29 @@ export async function createCategory(formData: FormData): Promise<{ error?: stri
     redirect("/");
   }
 
-  const slug = (formData.get("slug") as string)?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  const label = (formData.get("label") as string)?.trim();
-  const showOnHome = formData.get("showOnHome") === "true";
-  const imageFile = formData.get("image") as File | null;
+  const slugRaw = (formData.get("slug") as string)?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const labelRaw = (formData.get("label") as string)?.trim();
+  const showOnHomeRaw = formData.get("showOnHome") === "true";
   const parentIdStr = formData.get("parentId") as string | null;
-  const parentId = parentIdStr ? parseInt(parentIdStr, 10) : null;
-  const level = (formData.get("level") as "root" | "main" | "sub") || "main";
-  const storeType = (formData.get("storeType") as "streetwear" | "formal" | "both") || "both";
+  const parentIdRaw = parentIdStr ? parseInt(parentIdStr, 10) : null;
+  const levelRaw = (formData.get("level") as string) || "main";
+  const storeTypeRaw = (formData.get("storeType") as string) || "both";
 
-  if (!slug) return { error: "Slug is required" };
-  if (!label) return { error: "Label is required" };
+  const parsed = categorySchema.safeParse({
+    slug: slugRaw,
+    label: labelRaw,
+    showOnHome: showOnHomeRaw,
+    parentId: parentIdRaw,
+    level: levelRaw,
+    storeType: storeTypeRaw,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "Validation failed" };
+  }
+
+  const { slug, label, showOnHome, parentId, level, storeType } = parsed.data;
+  const imageFile = formData.get("image") as File | null;
 
   const existing = await db.select().from(productCategories).where(eq(productCategories.slug, slug)).limit(1);
   if (existing.length > 0) return { error: "A category with this slug already exists" };
@@ -148,19 +171,33 @@ export async function updateCategory(
     redirect("/");
   }
 
-  const slug = (formData.get("slug") as string)?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  const label = (formData.get("label") as string)?.trim();
-  const showOnHome = formData.get("showOnHome") === "true";
-  const imageFile = formData.get("image") as File | null;
+  const validId = z.number().int().positive().parse(id);
+
+  const slugRaw = (formData.get("slug") as string)?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const labelRaw = (formData.get("label") as string)?.trim();
+  const showOnHomeRaw = formData.get("showOnHome") === "true";
   const parentIdStr = formData.get("parentId") as string | null;
-  const parentId = parentIdStr ? parseInt(parentIdStr, 10) : null;
-  const level = (formData.get("level") as "root" | "main" | "sub") || "main";
-  const storeType = (formData.get("storeType") as "streetwear" | "formal" | "both") || "both";
+  const parentIdRaw = parentIdStr ? parseInt(parentIdStr, 10) : null;
+  const levelRaw = (formData.get("level") as string) || "main";
+  const storeTypeRaw = (formData.get("storeType") as string) || "both";
 
-  if (!slug) return { error: "Slug is required" };
-  if (!label) return { error: "Label is required" };
+  const parsed = categorySchema.safeParse({
+    slug: slugRaw,
+    label: labelRaw,
+    showOnHome: showOnHomeRaw,
+    parentId: parentIdRaw,
+    level: levelRaw,
+    storeType: storeTypeRaw,
+  });
 
-  const [existing] = await db.select().from(productCategories).where(eq(productCategories.id, id)).limit(1);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "Validation failed" };
+  }
+
+  const { slug, label, showOnHome, parentId, level, storeType } = parsed.data;
+  const imageFile = formData.get("image") as File | null;
+
+  const [existing] = await db.select().from(productCategories).where(eq(productCategories.id, validId)).limit(1);
   if (!existing) return { error: "Category not found" };
 
   const existingSlug = await db.select().from(productCategories).where(eq(productCategories.slug, slug)).limit(1);
@@ -184,8 +221,8 @@ export async function updateCategory(
   await db
     .update(productCategories)
     .set({ slug, label, image: imageUrl, showOnHome, parentId, level, storeType })
-    .where(eq(productCategories.id, id));
-  auditLog({ userId: userId!, action: "category.update", target: String(id), details: { slug, label } });
+    .where(eq(productCategories.id, validId));
+  auditLog({ userId: userId!, action: "category.update", target: String(validId), details: { slug, label } });
   return {};
 }
 
@@ -197,10 +234,12 @@ export async function deleteCategory(id: number): Promise<{ error?: string }> {
     redirect("/");
   }
 
-  const [existing] = await db.select().from(productCategories).where(eq(productCategories.id, id)).limit(1);
+  const validId = z.number().int().positive().parse(id);
+
+  const [existing] = await db.select().from(productCategories).where(eq(productCategories.id, validId)).limit(1);
   if (!existing) return { error: "Category not found" };
 
-  await db.delete(productCategories).where(eq(productCategories.id, id));
-  auditLog({ userId: userId!, action: "category.delete", target: String(id), details: { slug: existing.slug } });
+  await db.delete(productCategories).where(eq(productCategories.id, validId));
+  auditLog({ userId: userId!, action: "category.delete", target: String(validId), details: { slug: existing.slug } });
   return {};
 }

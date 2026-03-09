@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { promoCodes } from "@/db/schema";
 import { checkValidatePromoLimit } from "@/lib/rate-limit";
 import { auditLog } from "@/lib/audit";
+import { z } from "zod";
 
 const DEFAULT_SHIPPING_FEE = 5;
 
@@ -97,13 +98,17 @@ export async function validatePromoCode(
   cartSubtotal: number,
   shippingFee: number = DEFAULT_SHIPPING_FEE
 ): Promise<ValidatePromoResult> {
+  const validatedCode = z.string().min(1).parse(code);
+  const validatedCartSubtotal = z.number().min(0).parse(cartSubtotal);
+  const validatedShippingFee = z.number().min(0).parse(shippingFee);
+
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headersList.get("x-real-ip") ?? "unknown";
   const limit = checkValidatePromoLimit(ip);
   if (!limit.allowed) {
     throw new Error("Too many attempts. Please try again in a moment.");
   }
-  const result = await validateAndGetPromo(db, code, cartSubtotal, shippingFee);
+  const result = await validateAndGetPromo(db, validatedCode, validatedCartSubtotal, validatedShippingFee);
   return {
     discountAmount: result.discountAmount,
     promoCodeId: result.promoCodeId,
@@ -122,7 +127,11 @@ export async function validatePromoInTransaction(
   cartSubtotal: number,
   shippingFee: number
 ): Promise<{ discountAmount: number; promoCodeId: number }> {
-  const result = await validateAndGetPromo(tx, code, cartSubtotal, shippingFee);
+  const validatedCode = z.string().min(1).parse(code);
+  const validatedCartSubtotal = z.number().min(0).parse(cartSubtotal);
+  const validatedShippingFee = z.number().min(0).parse(shippingFee);
+
+  const result = await validateAndGetPromo(tx, validatedCode, validatedCartSubtotal, validatedShippingFee);
   return {
     discountAmount: result.discountAmount,
     promoCodeId: result.promoCodeId,
@@ -137,21 +146,42 @@ export async function createPromoCode(formData: FormData): Promise<{ error?: str
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "promo.create" });
     redirect("/");
   }
-  const code = (formData.get("code") as string)?.trim().toUpperCase();
-  const discountType = formData.get("discountType") as string;
-  const discountValue = parseFloat(String(formData.get("discountValue") ?? 0));
-  const minOrderAmount = parseFloat(String(formData.get("minOrderAmount") ?? 0));
-  const maxUsesRaw = formData.get("maxUses") as string;
-  const maxUses = maxUsesRaw?.trim() ? parseInt(maxUsesRaw, 10) : null;
-  const expiresAtRaw = formData.get("expiresAt") as string;
-  const expiresAt = expiresAtRaw?.trim() ? new Date(expiresAtRaw) : null;
 
-  if (!code) return { error: "Code is required" };
-  if (!["PERCENTAGE", "FIXED_AMOUNT", "FREE_SHIPPING"].includes(discountType)) {
-    return { error: "Invalid discount type" };
+  const promoSchema = z.object({
+    code: z.string().min(1).trim().toUpperCase(),
+    discountType: z.enum(["PERCENTAGE", "FIXED_AMOUNT", "FREE_SHIPPING"]),
+    discountValue: z.number().min(0),
+    minOrderAmount: z.number().min(0),
+    maxUses: z.number().int().positive().nullable(),
+    expiresAt: z.date().nullable(),
+  });
+
+  const codeRaw = (formData.get("code") as string)?.trim().toUpperCase();
+  const discountTypeRaw = formData.get("discountType") as string;
+  const discountValueRaw = parseFloat(String(formData.get("discountValue") ?? 0));
+  const minOrderAmountRaw = parseFloat(String(formData.get("minOrderAmount") ?? 0));
+  const maxUsesRawStr = formData.get("maxUses") as string;
+  const maxUsesRaw = maxUsesRawStr?.trim() ? parseInt(maxUsesRawStr, 10) : null;
+  const expiresAtRawStr = formData.get("expiresAt") as string;
+  const expiresAtRaw = expiresAtRawStr?.trim() ? new Date(expiresAtRawStr) : null;
+
+  const parsed = promoSchema.safeParse({
+    code: codeRaw,
+    discountType: discountTypeRaw,
+    discountValue: discountValueRaw,
+    minOrderAmount: minOrderAmountRaw,
+    maxUses: maxUsesRaw,
+    expiresAt: expiresAtRaw,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "Validation failed" };
   }
-  if (discountType !== "FREE_SHIPPING" && (isNaN(discountValue) || discountValue < 0)) {
-    return { error: "Valid discount value is required" };
+
+  const { code, discountType, discountValue, minOrderAmount, maxUses, expiresAt } = parsed.data;
+
+  if (discountType !== "FREE_SHIPPING" && discountValue <= 0) {
+    return { error: "Valid discount value is required for this discount type" };
   }
 
   try {
@@ -178,29 +208,31 @@ export async function createPromoCode(formData: FormData): Promise<{ error?: str
 }
 
 export async function togglePromoStatus(id: number): Promise<{ error?: string }> {
+  const validId = z.number().int().positive().parse(id);
   const { userId, sessionClaims } = await auth();
   if (!userId || sessionClaims?.metadata?.role !== "admin") {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "promo.toggle_status" });
     redirect("/");
   }
-  const [promo] = await db.select().from(promoCodes).where(eq(promoCodes.id, id)).limit(1);
+  const [promo] = await db.select().from(promoCodes).where(eq(promoCodes.id, validId)).limit(1);
   if (!promo) return { error: "Promo not found" };
   await db
     .update(promoCodes)
     .set({ isActive: !promo.isActive })
-    .where(eq(promoCodes.id, id));
-  auditLog({ userId, action: "promo.toggle_status", target: String(id), details: { code: promo.code, isActive: !promo.isActive } });
+    .where(eq(promoCodes.id, validId));
+  auditLog({ userId, action: "promo.toggle_status", target: String(validId), details: { code: promo.code, isActive: !promo.isActive } });
   return {};
 }
 
 export async function deletePromoCode(id: number): Promise<{ error?: string }> {
+  const validId = z.number().int().positive().parse(id);
   const { userId, sessionClaims } = await auth();
   if (!userId || sessionClaims?.metadata?.role !== "admin") {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "promo.delete" });
     redirect("/");
   }
-  const [promo] = await db.select({ code: promoCodes.code }).from(promoCodes).where(eq(promoCodes.id, id)).limit(1);
-  await db.delete(promoCodes).where(eq(promoCodes.id, id));
-  auditLog({ userId, action: "promo.delete", target: String(id), details: promo ? { code: promo.code } : undefined });
+  const [promo] = await db.select({ code: promoCodes.code }).from(promoCodes).where(eq(promoCodes.id, validId)).limit(1);
+  await db.delete(promoCodes).where(eq(promoCodes.id, validId));
+  auditLog({ userId, action: "promo.delete", target: String(validId), details: promo ? { code: promo.code } : undefined });
   return {};
 }

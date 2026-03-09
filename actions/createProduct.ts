@@ -7,6 +7,7 @@ import { products, productVariants, productColors } from "@/db/schema";
 import { uploadProductImage } from "@/lib/uploadImages";
 import { getValidCategorySlugs } from "@/actions/categories";
 import { auditLog } from "@/lib/audit";
+import { z } from "zod";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
@@ -17,21 +18,36 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
     redirect("/");
   }
 
-  const name = (formData.get("name") as string)?.trim();
-  const description = (formData.get("description") as string)?.trim() || null;
-  const price = formData.get("price") as string;
-  const categorySlug = formData.get("category") as string;
-  const storeType = (formData.get("storeType") as "streetwear" | "formal" | "both") || "both";
-  const isVisible = formData.get("isVisible") === "true";
-  const colorCount = parseInt(String(formData.get("color_count") ?? "0"), 10);
+  const productSchema = z.object({
+    name: z.string().min(1, "Name is required").trim(),
+    description: z.string().trim().nullable().optional(),
+    price: z.string().min(1).regex(/^\d+(\.\d{1,2})?$/, "Valid price is required"),
+    categorySlug: z.string().min(1),
+    storeType: z.enum(["streetwear", "formal", "both"]).default("both"),
+    isVisible: z.boolean(),
+    color_count: z.number().int().min(1, "Add at least one color"),
+  });
 
-  if (!name) return { error: "Name is required" };
-  if (!price || isNaN(parseFloat(price))) return { error: "Valid price is required" };
+  const parsed = productSchema.safeParse({
+    name: formData.get("name"),
+    description: formData.get("description") || null,
+    price: formData.get("price"),
+    categorySlug: formData.get("category"),
+    storeType: formData.get("storeType") || "both",
+    isVisible: formData.get("isVisible") === "true",
+    color_count: parseInt(String(formData.get("color_count") ?? "0"), 10),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "Validation failed" };
+  }
+
+  const { name, description, price, categorySlug, storeType, isVisible, color_count: colorCount } = parsed.data;
+
   const validSlugs = await getValidCategorySlugs();
   if (!validSlugs.includes(categorySlug)) {
     return { error: "Invalid category" };
   }
-  if (colorCount < 1) return { error: "Add at least one color" };
 
   // Parse colors from formData
   const colorEntries: Array<{

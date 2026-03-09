@@ -2,12 +2,13 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { asc, eq, max, inArray, and } from "drizzle-orm";
+import { asc, eq, max, and } from "drizzle-orm";
 import { db } from "@/db";
 import { lookbookItems, sectionSettings } from "@/db/schema";
 import { uploadLookImage } from "@/lib/uploadImages";
 import { validateHref } from "@/lib/security";
 import { auditLog } from "@/lib/audit";
+import { z } from "zod";
 
 const LOOKBOOK_SECTION_KEY = "lookbook";
 
@@ -23,6 +24,7 @@ export async function getLookbookSectionVisible(): Promise<boolean> {
 
 /** Sets whether the Get the Look section is visible. Admin only. */
 export async function setLookbookSectionVisible(visible: boolean) {
+  const validatedVisible = z.boolean().parse(visible);
   const { userId, sessionClaims } = await auth();
   if (sessionClaims?.metadata?.role !== "admin") {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "lookbook.visibility" });
@@ -38,12 +40,12 @@ export async function setLookbookSectionVisible(visible: boolean) {
   if (existing) {
     await db
       .update(sectionSettings)
-      .set({ isVisible: visible })
+      .set({ isVisible: validatedVisible })
       .where(eq(sectionSettings.id, existing.id));
   } else {
     await db.insert(sectionSettings).values({
       sectionKey: LOOKBOOK_SECTION_KEY,
-      isVisible: visible,
+      isVisible: validatedVisible,
     });
   }
 }
@@ -51,7 +53,8 @@ export async function setLookbookSectionVisible(visible: boolean) {
 export async function getLookbookItems(storeType?: string) {
   const conditions = [eq(lookbookItems.isActive, true)];
   if (storeType) {
-    conditions.push(eq(lookbookItems.storeType, storeType as "streetwear" | "formal"));
+    const validatedStore = z.enum(["streetwear", "formal"]).parse(storeType);
+    conditions.push(eq(lookbookItems.storeType, validatedStore));
   }
   return db
     .select()
@@ -74,32 +77,42 @@ export async function getAllLookbookItems() {
 }
 
 export async function deleteLookbookItem(id: number) {
+  const validId = z.number().int().positive().parse(id);
   const { userId, sessionClaims } = await auth();
   if (sessionClaims?.metadata?.role !== "admin") {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "lookbook.delete" });
     redirect("/");
   }
-  await db.delete(lookbookItems).where(eq(lookbookItems.id, id));
-  auditLog({ userId: userId!, action: "lookbook.delete", target: String(id) });
+  await db.delete(lookbookItems).where(eq(lookbookItems.id, validId));
+  auditLog({ userId: userId!, action: "lookbook.delete", target: String(validId) });
 }
 
 export async function updateLookbookItem(
   id: number,
   data: { label?: string; href?: string; order?: number; storeType?: "streetwear" | "formal" | "both" }
 ) {
+  const validId = z.number().int().positive().parse(id);
   const { userId, sessionClaims } = await auth();
   if (sessionClaims?.metadata?.role !== "admin") {
     auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "lookbook.update" });
     redirect("/");
   }
-  const updateData: { label?: string; href?: string; order?: number; storeType?: "streetwear" | "formal" | "both" } = { ...data };
-  if (data.href !== undefined) {
-    const validated = validateHref(data.href);
+  const updateSchema = z.object({
+    label: z.string().optional(),
+    href: z.string().optional(),
+    order: z.number().int().optional(),
+    storeType: z.enum(["streetwear", "formal", "both"]).optional(),
+  });
+  const parsedData = updateSchema.parse(data);
+
+  const updateData: typeof parsedData = { ...parsedData };
+  if (parsedData.href !== undefined) {
+    const validated = validateHref(parsedData.href);
     if (!validated.ok) throw new Error(validated.error);
     updateData.href = validated.href;
   }
-  await db.update(lookbookItems).set(updateData).where(eq(lookbookItems.id, id));
-  auditLog({ userId: userId!, action: "lookbook.update", target: String(id), details: data });
+  await db.update(lookbookItems).set(updateData).where(eq(lookbookItems.id, validId));
+  auditLog({ userId: userId!, action: "lookbook.update", target: String(validId), details: updateData });
 }
 
 /** Uploads a look image and adds it to the database. Admin only. */
@@ -111,15 +124,31 @@ export async function addLookbookItemFromFile(formData: FormData): Promise<{ err
   }
 
   const file = formData.get("image") as File | null;
-  const label = (formData.get("label") as string)?.trim();
-  const storeType = (formData.get("storeType") as "streetwear" | "formal" | "both") || "both";
-  const hrefRaw = ((formData.get("href") as string)?.trim()) || "/shop";
-  const hrefValidation = validateHref(hrefRaw);
+  const labelRaw = (formData.get("label") as string)?.trim();
+  const storeTypeRaw = (formData.get("storeType") as string) || "both";
+  const hrefRawValue = ((formData.get("href") as string)?.trim()) || "/shop";
+
+  const addSchema = z.object({
+    label: z.string().min(1),
+    storeType: z.enum(["streetwear", "formal", "both"]).default("both"),
+  });
+
+  const parsedData = addSchema.safeParse({
+    label: labelRaw,
+    storeType: storeTypeRaw,
+  });
+
+  if (!parsedData.success) {
+    return { error: parsedData.error.issues[0]?.message || "Validation failed" };
+  }
+
+  const { label, storeType } = parsedData.data;
+
+  const hrefValidation = validateHref(hrefRawValue);
   if (!hrefValidation.ok) return { error: hrefValidation.error };
   const href = hrefValidation.href;
 
   if (!file?.size) return { error: "No image provided" };
-  if (!label) return { error: "Label is required" };
 
   const filename = `look-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const result = await uploadLookImage(file, filename);

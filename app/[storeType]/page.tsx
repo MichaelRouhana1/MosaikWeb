@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { eq, desc, inArray, and } from "drizzle-orm";
 import { db } from "@/db";
-import { products, productColors, productCategories } from "@/db/schema";
+import { products, productColors } from "@/db/schema";
 import { getHeroImages } from "@/actions/hero";
 import { getHomeVideo } from "@/actions/video";
 import { getLookbookItems, getLookbookSectionVisible } from "@/actions/lookbook";
@@ -31,7 +31,7 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
 
   const storeSlugs = await getStoreCategorySlugs(storeType);
 
-  const [productList, heroImages, homeVideo, lookbookItems, lookbookSectionVisible, homeCategories, allCats] =
+  const [productList, heroImages, homeVideo, lookbookItems, lookbookSectionVisible, homeCategories] =
     await Promise.all([
       db
         .select()
@@ -44,7 +44,6 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
       getLookbookItems(storeType),
       getLookbookSectionVisible(),
       getCategoriesForHome(storeType),
-      db.select().from(productCategories),
     ]);
 
   const productIds = productList.map((p) => p.id);
@@ -81,7 +80,7 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
             fill
             className="object-cover"
             priority
-            unoptimized
+
           />
           <div className="relative z-10 max-w-[36ch] text-center px-6">
             <h1 className="text-3xl font-normal text-foreground mb-4 capitalize">
@@ -116,7 +115,7 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
                 alt={cat.label}
                 fill
                 className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
-                unoptimized={cat.image?.startsWith("http")}
+
               />
               <p className="absolute bottom-4 left-4 text-sm font-normal text-foreground group-hover:opacity-100 opacity-90 transition-opacity">
                 {cat.label}
@@ -155,7 +154,7 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
                     alt={item.label}
                     fill
                     className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
-                    unoptimized={item.imageUrl.startsWith("https://")}
+
                   />
                 </div>
                 <p className="text-sm font-normal text-foreground">{item.label}</p>
@@ -196,7 +195,7 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
                       alt={product.name}
                       fill
                       className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
-                      unoptimized={imageUrl.startsWith("https://")}
+
                     />
                   </div>
                   <p className="text-sm font-normal text-foreground">{product.name}</p>

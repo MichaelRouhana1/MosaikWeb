@@ -5,10 +5,11 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { products, productVariants, productColors } from "@/db/schema";
-import { uploadProductImage } from "@/lib/uploadImages";
+import { uploadProductImage, uploadProductImages } from "@/lib/uploadImages";
 import { getValidCategorySlugs } from "@/actions/categories";
 import { auditLog } from "@/lib/audit";
 import { z } from "zod";
+import { updateProductSchema } from "@/lib/schemas";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
@@ -24,16 +25,9 @@ export async function updateProduct(
 
   const validProductId = z.number().int().positive().parse(productId);
 
-  const productSchema = z.object({
-    name: z.string().min(1, "Name is required").trim(),
-    description: z.string().trim().nullable().optional(),
-    price: z.string().min(1).regex(/^\d+(\.\d{1,2})?$/, "Valid price is required"),
-    categorySlug: z.string().min(1),
-    isVisible: z.boolean(),
-    color_count: z.number().int().min(1, "Add at least one color"),
-  });
 
-  const parsed = productSchema.safeParse({
+
+  const parsed = updateProductSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description") || null,
     price: formData.get("price"),
@@ -96,12 +90,10 @@ export async function updateProduct(
   const colorImageUrls: string[][] = [];
   for (let i = 0; i < colorEntries.length; i++) {
     const urls: string[] = [...colorEntries[i].existingUrls];
-    for (const file of colorEntries[i].imageFiles) {
-      const filename = `product-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`;
-      const result = await uploadProductImage(file, filename);
-      if (result.error) return { error: result.error };
-      urls.push(result.url);
-    }
+    const prefix = `product-${Date.now()}-${i}`;
+    const result = await uploadProductImages(colorEntries[i].imageFiles, prefix);
+    if (result.error) return { error: result.error };
+    urls.push(...result.urls);
     colorImageUrls.push(urls);
   }
 

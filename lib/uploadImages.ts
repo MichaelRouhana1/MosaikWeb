@@ -71,3 +71,14 @@ export async function uploadHomeVideo(file: File, filename: string) {
 export async function uploadLookImage(file: File, filename: string) {
   return uploadFile(file, filename, "image", "lookbook");
 }
+
+export async function uploadProductImages(imageFiles: File[], prefix: string): Promise<{ urls: string[]; error?: string }> {
+  const urls: string[] = [];
+  for (const file of imageFiles) {
+    const filename = `${prefix}-${Math.random().toString(36).slice(2)}`;
+    const result = await uploadProductImage(file, filename);
+    if (result.error) return { urls, error: result.error };
+    urls.push(result.url);
+  }
+  return { urls };
+}

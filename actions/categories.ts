@@ -11,15 +11,7 @@ import { auditLog } from "@/lib/audit";
 export type ProductCategory = typeof productCategories.$inferSelect;
 
 import { z } from "zod";
-
-const categorySchema = z.object({
-  slug: z.string().min(1).trim().toLowerCase().regex(/^[a-z0-9-]+$/),
-  label: z.string().min(1).trim(),
-  showOnHome: z.boolean(),
-  parentId: z.number().int().positive().nullable(),
-  level: z.enum(["root", "main", "sub"]).default("main"),
-  storeType: z.enum(["streetwear", "formal", "both"]).default("both"),
-});
+import { categorySchema } from "@/lib/schemas";
 
 /** Valid slugs for shop filtering (from DB) */
 export async function getValidCategorySlugs(): Promise<string[]> {

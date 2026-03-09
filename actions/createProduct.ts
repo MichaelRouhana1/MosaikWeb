@@ -4,10 +4,11 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { products, productVariants, productColors } from "@/db/schema";
-import { uploadProductImage } from "@/lib/uploadImages";
+import { uploadProductImage, uploadProductImages } from "@/lib/uploadImages";
 import { getValidCategorySlugs } from "@/actions/categories";
 import { auditLog } from "@/lib/audit";
 import { z } from "zod";
+import { productSchema } from "@/lib/schemas";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
@@ -18,15 +19,7 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
     redirect("/");
   }
 
-  const productSchema = z.object({
-    name: z.string().min(1, "Name is required").trim(),
-    description: z.string().trim().nullable().optional(),
-    price: z.string().min(1).regex(/^\d+(\.\d{1,2})?$/, "Valid price is required"),
-    categorySlug: z.string().min(1),
-    storeType: z.enum(["streetwear", "formal", "both"]).default("both"),
-    isVisible: z.boolean(),
-    color_count: z.number().int().min(1, "Add at least one color"),
-  });
+
 
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
@@ -77,14 +70,10 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
   // Upload images for each color
   const colorImageUrls: string[][] = [];
   for (let i = 0; i < colorEntries.length; i++) {
-    const urls: string[] = [];
-    for (const file of colorEntries[i].imageFiles) {
-      const filename = `product-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`;
-      const result = await uploadProductImage(file, filename);
-      if (result.error) return { error: result.error };
-      urls.push(result.url);
-    }
-    colorImageUrls.push(urls);
+    const prefix = `product-${Date.now()}-${i}`;
+    const result = await uploadProductImages(colorEntries[i].imageFiles, prefix);
+    if (result.error) return { error: result.error };
+    colorImageUrls.push(result.urls);
   }
 
   const productId = await db.transaction(async (tx) => {

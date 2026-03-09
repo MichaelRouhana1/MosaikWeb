@@ -1,11 +1,11 @@
 import { Label } from "@/components/ui/label";
 import type { ProductCategory } from "@/actions/categories";
 
-interface CategorySelectProps {
+interface CategorySelectorProps {
     categories: ProductCategory[];
 }
 
-export function CategorySelect({ categories }: CategorySelectProps) {
+export function CategorySelector({ categories }: CategorySelectorProps) {
     return (
         <div className="space-y-2">
             <Label htmlFor="category">Category</Label>

@@ -14,10 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CategorySelect } from "@/components/admin/CategorySelect";
+import { CategorySelector } from "@/components/admin/CategorySelector";
 import { PriceInput } from "@/components/admin/PriceInput";
 import { StoreTypeSelect } from "@/components/admin/StoreTypeSelect";
-import { ImageUploadSection, type ColorEntry } from "@/components/admin/ImageUploadSection";
+import { ImageUploader, type ColorEntry } from "@/components/admin/ImageUploader";
+import { InventoryManager } from "@/components/admin/InventoryManager";
 import type { ProductCategory } from "@/actions/categories";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
@@ -144,7 +145,7 @@ export function CreateProductForm({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <PriceInput />
-            <CategorySelect categories={categories} />
+            <CategorySelector categories={categories} />
             <StoreTypeSelect initialStoreType={initialStoreType} />
           </div>
           <div className="flex items-center gap-2">
@@ -176,7 +177,7 @@ export function CreateProductForm({
             </div>
 
             {colors.map((color) => (
-              <ImageUploadSection
+              <ImageUploader
                 key={color.id}
                 color={color}
                 onUpdate={(updates) => updateColor(color.id, updates)}
@@ -200,55 +201,7 @@ export function CreateProductForm({
           </div>
 
           {/* Variant Matrix - shown when colors exist */}
-          {colors.length > 0 && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium">Stock by color & size</h3>
-                <p className="text-xs text-muted-foreground">
-                  Set inventory for each color and size combination
-                </p>
-              </div>
-              <div className="border border-border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="text-left p-3 font-medium">Color</th>
-                      {SIZES.map((s) => (
-                        <th key={s} className="p-3 font-medium text-center">
-                          {s}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {colors.map((color) => (
-                      <tr key={color.id} className="border-t border-border">
-                        <td className="p-3 font-medium">{color.name || "—"}</td>
-                        {SIZES.map((size) => (
-                          <td key={size} className="p-2">
-                            <Input
-                              type="number"
-                              min={0}
-                              value={color.stockBySize[size] ?? 0}
-                              onChange={(e) =>
-                                updateColor(color.id, {
-                                  stockBySize: {
-                                    ...color.stockBySize,
-                                    [size]: Math.max(0, parseInt(e.target.value, 10) || 0),
-                                  },
-                                })
-                              }
-                              className="h-8 w-16 text-center"
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          <InventoryManager colors={colors} sizes={SIZES} updateColor={updateColor} />
 
           {state?.error && (
             <p className="text-sm text-destructive">{state.error}</p>

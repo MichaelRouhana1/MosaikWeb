@@ -16,7 +16,7 @@ export interface ColorEntry {
     stockBySize: Record<string, number>;
 }
 
-interface ImageUploadSectionProps {
+interface ImageUploaderProps {
     color: ColorEntry;
     onUpdate: (updates: Partial<Omit<ColorEntry, "id">>) => void;
     onRemove: () => void;
@@ -25,14 +25,14 @@ interface ImageUploadSectionProps {
     canRemove: boolean;
 }
 
-export function ImageUploadSection({
+export function ImageUploader({
     color,
     onUpdate,
     onRemove,
     onAddFiles,
     onRemoveFile,
     canRemove,
-}: ImageUploadSectionProps) {
+}: ImageUploaderProps) {
     const [cropPending, setCropPending] = useState<{ file: File; objectUrl: string } | null>(null);
     const cropQueueRef = useRef<File[]>([]);
 

@@ -26,7 +26,8 @@ export type AuditAction =
   | "lookbook.delete"
   | "video.upload"
   | "video.delete"
-  | "auth.failed_admin";
+  | "auth.failed_admin"
+  | "account.delete";
 
 export interface AuditEntry {
   timestamp: string;

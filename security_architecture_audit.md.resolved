@@ -401,7 +401,7 @@ const queryClient = postgres(connectionString, {
 | 🟠 **P1 — This Sprint** | ARCH-01 | Add connection pool config and `prepare: false` | 10 min | ✅ Fixed |
 | 🟡 **P2 — Next Sprint** | SEC-03 | Implement nonce-based CSP | 2-4 hours | ✅ Fixed |
 | 🟡 **P2 — Next Sprint** | SEC-06 | Add Zod validation to all action parameters | 1 hour | ✅ Fixed |
-| 🟡 **P2 — Next Sprint** | PRIV-02 | Implement right-to-deletion architecture | 4 hours | |
+| 🟡 **P2 — Next Sprint** | PRIV-02 | Implement right-to-deletion architecture | 4 hours | ✅ Fixed |
 | 🟡 **P2 — Next Sprint** | PERF-03 | Migrate to Redis-based rate limiter | 2 hours | ✅ Fixed |
 | 🟢 **P3 — Backlog** | DEV-02 | Refactor bloated components | 1 day | |
 | 🟢 **P3 — Backlog** | DEV-03 | Consolidate upload functions | 1 hour | ✅ Fixed |

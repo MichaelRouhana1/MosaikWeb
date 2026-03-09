@@ -10,6 +10,7 @@ import { getValidCategorySlugs } from "@/actions/categories";
 import { auditLog } from "@/lib/audit";
 import { z } from "zod";
 import { updateProductSchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
@@ -19,6 +20,7 @@ export async function updateProduct(
 ): Promise<{ success?: boolean; error?: string }> {
   const parsedId = z.number().int().positive().safeParse(productId);
   if (!parsedId.success) {
+    logger.error("Update product invalid ID", undefined, { productId });
     return { success: false, error: "Validation failed" };
   }
   const validProductId = parsedId.data;
@@ -33,7 +35,9 @@ export async function updateProduct(
   });
 
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
+    const errorDetails = parsed.error.issues[0]?.message || "Validation failed";
+    logger.error("Update product validation failed", undefined, { errorDetails, formData: Array.from(formData.entries()), productId });
+    return { success: false, error: errorDetails };
   }
 
   const { userId, sessionClaims } = await auth();
@@ -46,6 +50,7 @@ export async function updateProduct(
 
   const validSlugs = await getValidCategorySlugs();
   if (!validSlugs.includes(categorySlug)) {
+    logger.error("Invalid category slug in updateProduct", undefined, { categorySlug, productId });
     return { error: "Invalid category" };
   }
 
@@ -77,7 +82,10 @@ export async function updateProduct(
     for (const size of SIZES) {
       stockBySize[size] = Math.max(0, parseInt(String(formData.get(`color_${i}_stock_${size}`)), 10) || 0);
     }
-    if (!colorName) return { error: `Color ${i + 1} must have a name` };
+    if (!colorName) {
+      logger.error("Color missing name across variants in updateProduct", undefined, { colorIndex: i, productId });
+      return { error: `Color ${i + 1} must have a name` };
+    }
     colorEntries.push({
       existingId,
       name: colorName,
@@ -94,7 +102,10 @@ export async function updateProduct(
     const urls: string[] = [...colorEntries[i].existingUrls];
     const prefix = `product-${Date.now()}-${i}`;
     const result = await uploadProductImages(colorEntries[i].imageFiles, prefix);
-    if (result.error) return { error: result.error };
+    if (result.error) {
+      logger.error("Failed to upload product images in updateProduct", undefined, { errorDetails: result.error, productId });
+      return { error: result.error };
+    }
     urls.push(...result.urls);
     colorImageUrls.push(urls);
   }

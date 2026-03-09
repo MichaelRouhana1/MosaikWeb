@@ -9,6 +9,7 @@ import { getValidCategorySlugs } from "@/actions/categories";
 import { auditLog } from "@/lib/audit";
 import { z } from "zod";
 import { productSchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
@@ -24,7 +25,9 @@ export async function createProduct(formData: FormData): Promise<{ success?: boo
   });
 
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
+    const errorDetails = parsed.error.issues[0]?.message || "Validation failed";
+    logger.error("Create product validation failed", undefined, { errorDetails, formData: Array.from(formData.entries()) });
+    return { success: false, error: errorDetails };
   }
 
   const { userId, sessionClaims } = await auth();
@@ -37,6 +40,7 @@ export async function createProduct(formData: FormData): Promise<{ success?: boo
 
   const validSlugs = await getValidCategorySlugs();
   if (!validSlugs.includes(categorySlug)) {
+    logger.error("Invalid category slug in createProduct", undefined, { categorySlug });
     return { error: "Invalid category" };
   }
 
@@ -56,7 +60,10 @@ export async function createProduct(formData: FormData): Promise<{ success?: boo
     for (const size of SIZES) {
       stockBySize[size] = Math.max(0, parseInt(String(formData.get(`color_${i}_stock_${size}`)), 10) || 0);
     }
-    if (!colorName) return { error: `Color ${i + 1} must have a name` };
+    if (!colorName) {
+      logger.error("Color missing name across variants", undefined, { colorIndex: i });
+      return { error: `Color ${i + 1} must have a name` };
+    }
     colorEntries.push({
       name: colorName,
       hexCode: colorHex,
@@ -70,7 +77,10 @@ export async function createProduct(formData: FormData): Promise<{ success?: boo
   for (let i = 0; i < colorEntries.length; i++) {
     const prefix = `product-${Date.now()}-${i}`;
     const result = await uploadProductImages(colorEntries[i].imageFiles, prefix);
-    if (result.error) return { error: result.error };
+    if (result.error) {
+      logger.error("Failed to upload product images", undefined, { errorDetails: result.error });
+      return { error: result.error };
+    }
     colorImageUrls.push(result.urls);
   }
 

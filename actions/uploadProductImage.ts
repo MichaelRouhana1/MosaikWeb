@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { validateUploadFile } from "@/lib/security";
+import { logger } from "@/lib/logger";
 
 const BUCKET = "products";
 
@@ -35,7 +36,7 @@ export async function uploadProductImage(
     });
 
   if (uploadError) {
-    console.error("Supabase upload error:", uploadError);
+    logger.error("Supabase upload error", uploadError);
     return { error: uploadError.message };
   }
 

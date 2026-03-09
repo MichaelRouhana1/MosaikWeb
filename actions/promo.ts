@@ -9,6 +9,7 @@ import { promoCodes } from "@/db/schema";
 import { checkValidatePromoLimit } from "@/lib/rate-limit";
 import { auditLog } from "@/lib/audit";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 const DEFAULT_SHIPPING_FEE = 5;
 
@@ -106,6 +107,7 @@ export async function validatePromoCode(
   const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headersList.get("x-real-ip") ?? "unknown";
   const limit = await checkValidatePromoLimit(ip);
   if (!limit.allowed) {
+    logger.warn("Rate limit exceeded for validatePromo", { ip });
     return { success: false, error: "Too many requests. Please wait before trying again." };
   }
   const result = await validateAndGetPromo(db, validatedCode, validatedCartSubtotal, validatedShippingFee);
@@ -169,7 +171,9 @@ export async function createPromoCode(formData: FormData): Promise<{ success?: b
   });
 
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
+    const errorDetails = parsed.error.issues[0]?.message || "Validation failed";
+    logger.error("Create promo validation failed", undefined, { errorDetails, formData: Array.from(formData.entries()) });
+    return { success: false, error: errorDetails };
   }
 
   const { userId, sessionClaims } = await auth();
@@ -181,6 +185,7 @@ export async function createPromoCode(formData: FormData): Promise<{ success?: b
   const { code, discountType, discountValue, minOrderAmount, maxUses, expiresAt } = parsed.data;
 
   if (discountType !== "FREE_SHIPPING" && discountValue <= 0) {
+    logger.error("Invalid discount value for promo code", undefined, { discountType, discountValue });
     return { success: false, error: "Valid discount value is required for this discount type" };
   }
 
@@ -201,8 +206,10 @@ export async function createPromoCode(formData: FormData): Promise<{ success?: b
     return { id: inserted.id };
   } catch (e) {
     if (e && typeof e === "object" && "code" in e && (e as { code: string }).code === "23505") {
+      logger.error("Promo code already exists", e, { code });
       return { success: false, error: "A promo code with this code already exists" };
     }
+    logger.error("Failed to create promo code", e, { code });
     return { success: false, error: "Failed to create promo code" };
   }
 }

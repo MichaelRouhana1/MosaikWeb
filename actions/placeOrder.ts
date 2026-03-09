@@ -16,6 +16,7 @@ import { validatePromoInTransaction } from "@/actions/promo";
 import { getProductDisplayPrice } from "@/lib/utils";
 import { escapeHtml } from "@/lib/security";
 import { checkPlaceOrderLimit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 const DEFAULT_SHIPPING_FEE = 5;
 
@@ -47,6 +48,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId?: nu
   const identifier = input.userId ?? input.guestEmail ?? ip;
   const limit = await checkPlaceOrderLimit(identifier);
   if (!limit.allowed) {
+    logger.warn("Rate limit exceeded for placeOrder", { identifier });
     return { success: false, error: "Too many requests. Please wait before trying again." };
   }
 
@@ -56,6 +58,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId?: nu
     const message = Object.entries(firstError)
       .map(([k, v]) => `${k}: ${Array.isArray(v) ? v[0] : v}`)
       .join("; ");
+    logger.error("Place order validation failed", undefined, { ip, message });
     throw new Error(message);
   }
 
@@ -225,7 +228,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId?: nu
         `,
       });
     } catch (err) {
-      console.error("Failed to send confirmation email:", err);
+      logger.error("Failed to send confirmation email", err, { orderId: orderResult.orderId });
     }
   }
 

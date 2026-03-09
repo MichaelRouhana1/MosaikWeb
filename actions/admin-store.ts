@@ -7,6 +7,7 @@ import { cookies } from "next/headers";
 import { db } from "@/db";
 import { products } from "@/db/schema";
 import { isNull } from "drizzle-orm";
+import { logger } from "@/lib/logger";
 
 export async function setAdminStoreType(storeType: "streetwear" | "formal") {
     const { userId, sessionClaims } = await auth();
@@ -45,7 +46,7 @@ export async function migrateMissingStoreTypes() {
         await db.update(products).set({ storeType: "streetwear" }).where(isNull(products.storeType));
         return { success: true };
     } catch (err) {
-        console.error("Migration error:", err);
+        logger.error("Migration error:", err);
         return { error: String(err) };
     }
 }

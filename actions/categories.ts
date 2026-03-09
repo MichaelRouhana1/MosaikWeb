@@ -14,6 +14,7 @@ export type ProductCategory = typeof productCategories.$inferSelect;
 
 import { z } from "zod";
 import { categorySchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 /** Valid slugs for shop filtering (from DB) */
 export async function getValidCategorySlugs(): Promise<string[]> {
@@ -106,13 +107,16 @@ export async function createCategory(formData: FormData): Promise<{ success?: bo
   });
 
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
+    const errorDetails = parsed.error.issues[0]?.message || "Validation failed";
+    logger.error("Create category validation failed", undefined, { errorDetails, formData: Array.from(formData.entries()) });
+    return { success: false, error: errorDetails };
   }
 
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headersList.get("x-real-ip") ?? "unknown";
   const limit = await checkSensitiveOperationLimit(`admin-category-create:${ip}`);
   if (!limit.allowed) {
+    logger.warn("Rate limit exceeded for admin-category-create", { ip });
     return { success: false, error: "Too many requests. Please wait before trying again." };
   }
 
@@ -168,6 +172,7 @@ export async function updateCategory(
 ): Promise<{ success?: boolean; error?: string }> {
   const parsedId = z.number().int().positive().safeParse(id);
   if (!parsedId.success) {
+    logger.error("Update category invalid ID", undefined, { id });
     return { success: false, error: "Validation failed" };
   }
   const validId = parsedId.data;
@@ -190,13 +195,16 @@ export async function updateCategory(
   });
 
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
+    const errorDetails = parsed.error.issues[0]?.message || "Validation failed";
+    logger.error("Update category validation failed", undefined, { errorDetails, formData: Array.from(formData.entries()), id });
+    return { success: false, error: errorDetails };
   }
 
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headersList.get("x-real-ip") ?? "unknown";
   const limit = await checkSensitiveOperationLimit(`admin-category-update:${ip}`);
   if (!limit.allowed) {
+    logger.warn("Rate limit exceeded for admin-category-update", { ip, id });
     return { success: false, error: "Too many requests. Please wait before trying again." };
   }
 

@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { wishlists } from "@/db/schema";
 import { checkToggleWishlistLimit } from "@/lib/rate-limit";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 export async function toggleWishlist(productId: number): Promise<{
   success?: boolean;
@@ -19,6 +20,7 @@ export async function toggleWishlist(productId: number): Promise<{
   }
   const limit = await checkToggleWishlistLimit(userId);
   if (!limit.allowed) {
+    logger.warn("Rate limit exceeded for toggleWishlist", { userId });
     return { success: false, error: "Too many requests. Please wait before trying again." };
   }
 

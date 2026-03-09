@@ -16,16 +16,12 @@ const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 export async function updateProduct(
   productId: number,
   formData: FormData
-): Promise<{ error?: string }> {
-  const { userId, sessionClaims } = await auth();
-  if (!userId || sessionClaims?.metadata?.role !== "admin") {
-    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "product.update" });
-    redirect("/");
+): Promise<{ success?: boolean; error?: string }> {
+  const parsedId = z.number().int().positive().safeParse(productId);
+  if (!parsedId.success) {
+    return { success: false, error: "Validation failed" };
   }
-
-  const validProductId = z.number().int().positive().parse(productId);
-
-
+  const validProductId = parsedId.data;
 
   const parsed = updateProductSchema.safeParse({
     name: formData.get("name"),
@@ -37,7 +33,13 @@ export async function updateProduct(
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message || "Validation failed" };
+    return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
+  }
+
+  const { userId, sessionClaims } = await auth();
+  if (!userId || sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "product.update" });
+    redirect("/");
   }
 
   const { name, description, price, categorySlug, isVisible, color_count: colorCount } = parsed.data;

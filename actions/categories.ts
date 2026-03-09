@@ -85,13 +85,7 @@ export async function getAllCategories(): Promise<ProductCategory[]> {
 }
 
 /** Admin: create category */
-export async function createCategory(formData: FormData): Promise<{ error?: string }> {
-  const { userId, sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") {
-    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "category.create" });
-    redirect("/");
-  }
-
+export async function createCategory(formData: FormData): Promise<{ success?: boolean; error?: string }> {
   const slugRaw = (formData.get("slug") as string)?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
   const labelRaw = (formData.get("label") as string)?.trim();
   const showOnHomeRaw = formData.get("showOnHome") === "true";
@@ -110,7 +104,13 @@ export async function createCategory(formData: FormData): Promise<{ error?: stri
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message || "Validation failed" };
+    return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
+  }
+
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "category.create" });
+    redirect("/");
   }
 
   const { slug, label, showOnHome, parentId, level, storeType } = parsed.data;
@@ -156,14 +156,12 @@ export async function createCategory(formData: FormData): Promise<{ error?: stri
 export async function updateCategory(
   id: number,
   formData: FormData
-): Promise<{ error?: string }> {
-  const { userId, sessionClaims } = await auth();
-  if (sessionClaims?.metadata?.role !== "admin") {
-    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "category.update" });
-    redirect("/");
+): Promise<{ success?: boolean; error?: string }> {
+  const parsedId = z.number().int().positive().safeParse(id);
+  if (!parsedId.success) {
+    return { success: false, error: "Validation failed" };
   }
-
-  const validId = z.number().int().positive().parse(id);
+  const validId = parsedId.data;
 
   const slugRaw = (formData.get("slug") as string)?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
   const labelRaw = (formData.get("label") as string)?.trim();
@@ -183,7 +181,13 @@ export async function updateCategory(
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message || "Validation failed" };
+    return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
+  }
+
+  const { userId, sessionClaims } = await auth();
+  if (sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "category.update" });
+    redirect("/");
   }
 
   const { slug, label, showOnHome, parentId, level, storeType } = parsed.data;

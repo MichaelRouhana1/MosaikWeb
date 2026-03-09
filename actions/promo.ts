@@ -140,13 +140,7 @@ export async function validatePromoInTransaction(
 
 // --- Admin CRUD ---
 
-export async function createPromoCode(formData: FormData): Promise<{ error?: string; id?: number }> {
-  const { userId, sessionClaims } = await auth();
-  if (!userId || sessionClaims?.metadata?.role !== "admin") {
-    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "promo.create" });
-    redirect("/");
-  }
-
+export async function createPromoCode(formData: FormData): Promise<{ success?: boolean; error?: string; id?: number }> {
   const promoSchema = z.object({
     code: z.string().min(1).trim().toUpperCase(),
     discountType: z.enum(["PERCENTAGE", "FIXED_AMOUNT", "FREE_SHIPPING"]),
@@ -175,13 +169,19 @@ export async function createPromoCode(formData: FormData): Promise<{ error?: str
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message || "Validation failed" };
+    return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
+  }
+
+  const { userId, sessionClaims } = await auth();
+  if (!userId || sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "promo.create" });
+    redirect("/");
   }
 
   const { code, discountType, discountValue, minOrderAmount, maxUses, expiresAt } = parsed.data;
 
   if (discountType !== "FREE_SHIPPING" && discountValue <= 0) {
-    return { error: "Valid discount value is required for this discount type" };
+    return { success: false, error: "Valid discount value is required for this discount type" };
   }
 
   try {
@@ -201,9 +201,9 @@ export async function createPromoCode(formData: FormData): Promise<{ error?: str
     return { id: inserted.id };
   } catch (e) {
     if (e && typeof e === "object" && "code" in e && (e as { code: string }).code === "23505") {
-      return { error: "A promo code with this code already exists" };
+      return { success: false, error: "A promo code with this code already exists" };
     }
-    return { error: "Failed to create promo code" };
+    return { success: false, error: "Failed to create promo code" };
   }
 }
 

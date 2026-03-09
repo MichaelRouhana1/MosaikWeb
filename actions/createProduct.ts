@@ -12,15 +12,7 @@ import { productSchema } from "@/lib/schemas";
 
 const SIZES = ["XS", "S", "M", "L", "XL"] as const;
 
-export async function createProduct(formData: FormData): Promise<{ error?: string; productId?: number }> {
-  const { userId, sessionClaims } = await auth();
-  if (!userId || sessionClaims?.metadata?.role !== "admin") {
-    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "product.create" });
-    redirect("/");
-  }
-
-
-
+export async function createProduct(formData: FormData): Promise<{ success?: boolean; error?: string; productId?: number }> {
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description") || null,
@@ -32,7 +24,13 @@ export async function createProduct(formData: FormData): Promise<{ error?: strin
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message || "Validation failed" };
+    return { success: false, error: parsed.error.issues[0]?.message || "Validation failed" };
+  }
+
+  const { userId, sessionClaims } = await auth();
+  if (!userId || sessionClaims?.metadata?.role !== "admin") {
+    auditLog({ userId: userId ?? null, action: "auth.failed_admin", target: "product.create" });
+    redirect("/");
   }
 
   const { name, description, price, categorySlug, storeType, isVisible, color_count: colorCount } = parsed.data;

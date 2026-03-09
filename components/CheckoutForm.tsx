@@ -213,7 +213,7 @@ export function CheckoutForm({ cart }: CheckoutFormProps) {
             </ul>
 
             <div className="space-y-2 pt-2 border-t border-border">
-              <Label className="text-muted-foreground">Promo code</Label>
+              <Label htmlFor="promoCode" className="text-muted-foreground">Promo code</Label>
               {appliedPromo ? (
                 <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
                   <span className="text-sm font-medium text-green-600 dark:text-green-400">
@@ -230,6 +230,7 @@ export function CheckoutForm({ cart }: CheckoutFormProps) {
               ) : (
                 <div className="flex gap-2">
                   <Input
+                    id="promoCode"
                     placeholder="Enter code"
                     value={promoInput}
                     onChange={(e) => setPromoInput(e.target.value.toUpperCase())}

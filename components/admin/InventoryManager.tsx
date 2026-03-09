@@ -38,6 +38,7 @@ export function InventoryManager({ colors, sizes, updateColor }: InventoryManage
                                     <td key={size} className="p-2">
                                         <Input
                                             type="number"
+                                            aria-label={`Stock for ${color.name} size ${size}`}
                                             min={0}
                                             value={color.stockBySize[size] ?? 0}
                                             onChange={(e) =>

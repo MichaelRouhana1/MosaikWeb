@@ -39,14 +39,15 @@ export function ShopSidebar() {
   }
 
   return (
-    <aside className="w-64 shrink-0 space-y-6">
+    <aside className="w-64 shrink-0 space-y-6" aria-labelledby="shop-sidebar-heading">
+      <h2 id="shop-sidebar-heading" className="sr-only">Shop Filters</h2>
       <div className="space-y-2">
-        <Label>Category</Label>
+        <h3 className="font-medium text-sm"><Label htmlFor="category-select">Category</Label></h3>
         <Select
           value={category}
           onValueChange={(value) => updateParams("category", value)}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger id="category-select" className="w-full" aria-label="Select category">
             <SelectValue placeholder="All categories" />
           </SelectTrigger>
           <SelectContent>
@@ -60,9 +61,9 @@ export function ShopSidebar() {
         </Select>
       </div>
       <div className="space-y-2">
-        <Label>Sort by</Label>
+        <h3 className="font-medium text-sm"><Label htmlFor="sort-select">Sort by</Label></h3>
         <Select value={sort} onValueChange={(value) => updateParams("sort", value)}>
-          <SelectTrigger className="w-full">
+          <SelectTrigger id="sort-select" className="w-full" aria-label="Select sort order">
             <SelectValue placeholder="Sort order" />
           </SelectTrigger>
           <SelectContent>

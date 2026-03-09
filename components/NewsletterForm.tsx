@@ -10,6 +10,7 @@ export function NewsletterForm() {
         <form className="flex flex-col sm:flex-row gap-2" onSubmit={(e) => e.preventDefault()}>
           <input
             type="email"
+            aria-label="Email address"
             placeholder="Email"
             className="flex-1 py-3 px-4 border border-border bg-transparent text-sm font-normal text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground transition-colors duration-200 rounded-md"
           />

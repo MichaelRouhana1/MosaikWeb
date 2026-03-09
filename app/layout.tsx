@@ -39,8 +39,13 @@ export default async function RootLayout({
         >
           <ThemeProvider>
             <CartProvider>
+              <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:p-4 focus:bg-background focus:text-foreground">
+                Skip to content
+              </a>
               <Navbar />
-              {children}
+              <div id="main-content">
+                {children}
+              </div>
               <Toaster richColors position="top-right" />
             </CartProvider>
           </ThemeProvider>

@@ -88,8 +88,9 @@ export function ImageUploader({
             <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                        <Label>Color name</Label>
+                        <Label htmlFor={`color-name-${color.id}`}>Color name</Label>
                         <Input
+                            id={`color-name-${color.id}`}
                             placeholder="e.g. Midnight Black"
                             value={color.name}
                             onChange={(e) => onUpdate({ name: e.target.value })}
@@ -97,15 +98,17 @@ export function ImageUploader({
                         />
                     </div>
                     <div className="space-y-1.5">
-                        <Label>Hex code</Label>
+                        <Label htmlFor={`color-hex-${color.id}`}>Hex code</Label>
                         <div className="flex gap-2 items-center">
                             <input
                                 type="color"
+                                aria-label={`Choose hex code for ${color.name}`}
                                 value={color.hexCode}
                                 onChange={(e) => onUpdate({ hexCode: e.target.value })}
                                 className="h-10 w-14 cursor-pointer rounded border border-input bg-transparent p-1"
                             />
                             <Input
+                                id={`color-hex-${color.id}`}
                                 value={color.hexCode}
                                 onChange={(e) => onUpdate({ hexCode: e.target.value })}
                                 placeholder="#000000"
@@ -121,7 +124,7 @@ export function ImageUploader({
                 )}
             </div>
             <div className="space-y-1.5">
-                <Label>Images (this color only)</Label>
+                <Label id={`images-label-${color.id}`}>Images (this color only)</Label>
                 <div
                     {...getRootProps()}
                     className={cn(
@@ -129,7 +132,7 @@ export function ImageUploader({
                         isDragActive ? "border-primary bg-primary/5" : "hover:bg-muted/50"
                     )}
                 >
-                    <input {...getInputProps()} />
+                    <input {...getInputProps()} aria-labelledby={`images-label-${color.id}`} />
                     <p className="text-center text-sm text-muted-foreground">
                         {isDragActive ? "Drop images here…" : "Drag & drop or click to add images"}
                     </p>

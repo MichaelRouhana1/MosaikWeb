@@ -161,7 +161,7 @@ export function ProductCard({
             onClick={handleWishlistClick}
             className={`absolute top-2 right-2 z-10 flex items-center justify-center bg-card/90 dark:bg-card/90 text-foreground hover:opacity-90 transition-colors ${compact ? "w-8 h-8" : "w-10 h-10"
               }`}
-            aria-label={wishlistState ? "Remove from favorites" : "Add to favorites"}
+            aria-label={wishlistState ? "Remove from wishlist" : "Add to wishlist"}
           >
             {wishlistState ? (
               <svg
@@ -273,12 +273,12 @@ export function ProductCard({
         </div>
         <div className={`flex items-start justify-between gap-2 ${compact ? "mt-2" : "mt-3"}`}>
           <div className="min-w-0 flex-1">
-            <h3
+            <h2
               className={`font-light text-foreground truncate ${compact ? "text-xs" : "text-sm"
                 }`}
             >
               {product.name}
-            </h3>
+            </h2>
             <p className="text-xs font-light text-muted-foreground mt-0.5">
               {colorLabel}
               {hasMultipleColors && colors && (

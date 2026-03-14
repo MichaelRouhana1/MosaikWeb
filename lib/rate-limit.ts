@@ -1,19 +1,27 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || "",
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || "",
-});
+const redis =
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+    ? new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      })
+    : null;
 
 // Common limited operations: 5 requests per 10 seconds
-const defaultLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, "10 s"),
-  prefix: "@upstash/ratelimit",
-});
+const defaultLimiter = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, "10 s"),
+      prefix: "@upstash/ratelimit",
+    })
+  : null;
 
 export async function checkRateLimit(identifier: string): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  if (!defaultLimiter) {
+    return { allowed: true, retryAfterMs: 0 };
+  }
   try {
     const { success, reset } = await defaultLimiter.limit(identifier);
     return { allowed: success, retryAfterMs: Math.max(0, reset - Date.now()) };

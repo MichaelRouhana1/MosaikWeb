@@ -1,0 +1,32 @@
+# MOSAIK Project Rules
+
+## Tech Stack & Architecture
+- **Framework:** Next.js 15 (App Router) with Turbopack.
+- **React:** Version 19.1.0.
+- **Styling:** Tailwind CSS v4.
+- **Database:** Drizzle ORM with Supabase PostgreSQL.
+- **Authentication:** Clerk Auth.
+- **Storage:** Supabase Storage.
+
+## Critical Constraints (Gotchas)
+- **Dependency Installation:** Always use `npm install --legacy-peer-deps` due to peer dependency conflicts between Clerk and React 19.
+- **Database Operations:** - Use the direct connection (port 5432) for `drizzle-kit push` or schema operations.
+    - Do not use the Supabase pooler (port 6543) for migrations as it will hang.
+- **Authentication Testing:** Clerk dev mode requires a browser; automated non-browser requests (like curl) will return HTTP 500.
+- **Post-install:** `patch-package` is required and runs automatically via the `postinstall` hook.
+
+## Development Workflow
+- **Dev Server:** Run using `npm run dev`.
+- **Migrations:** Use `npm run db:migrate:all` to run the full suite of migration scripts.
+- **Environment Variables:** Ensure `.env.local` contains `DATABASE_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`.
+
+## Coding Standards
+- Use TypeScript for all new files.
+- Favor Server Actions and React Server Components where applicable in the App Router.
+- Follow the existing schema definitions in `db/schema.ts` when suggesting database changes.
+
+## Post-Prompt Workflow
+- After completing the requested changes, you must provide a one-line terminal command to commit the work.
+- The command must follow this format: `git add . && git commit -m "brief description of changes" && git push`.
+- Replace "brief description of changes" with a concise, present-tense summary of the specific code logic or UI updates you just performed (e.g., "feat: update product grid layout" or "fix: resolve clerk auth redirect").
+- Do not use generic messages like "updated files" or "fixed bugs."

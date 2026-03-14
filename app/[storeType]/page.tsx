@@ -1,8 +1,6 @@
-import Image from "next/image";
-import Link from "next/link";
-import { eq, desc, inArray, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { products, productColors } from "@/db/schema";
+import { products } from "@/db/schema";
 import { getHeroImages } from "@/actions/hero";
 import { getHomeVideo } from "@/actions/video";
 import { getLookbookItems, getLookbookSectionVisible } from "@/actions/lookbook";
@@ -24,9 +22,9 @@ export async function generateMetadata({ params }: { params: Promise<{ storeType
   const isStreetwear = storeType === "streetwear";
   const title = isStreetwear ? "Streetwear Essentials" : storeType === "formal" ? "Formal Tailoring" : "Shop";
   const description = isStreetwear
-    ? "Discover our latest streetwear collection featuring modern silhouettes, bold graphics, and premium everyday essentials."
+    ? "Modern urban culture, bold graphics, and premium everyday essentials. Your streetwear destination."
     : storeType === "formal"
-      ? "Elevate your style with our formal tailoring collection. Bespoke suits, crisp shirts, and refined accessories for every occasion."
+      ? "Bespoke tailoring, crisp shirts, and refined accessories for every occasion. Elevate your formal style."
       : "Shop our exclusive MOSAIK collections.";
 
   return {
@@ -53,12 +51,31 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
   const { storeType } = await params;
   if (storeType !== "streetwear" && storeType !== "formal") return notFound();
 
-  const storeSlugs = await getStoreCategorySlugs(storeType);
-
-  const [productList, heroImages, homeVideo, lookbookItems, lookbookSectionVisible, homeCategories] =
+  const [productListWithImages, heroImages, homeVideo, lookbookItems, lookbookSectionVisible, homeCategories, storeSlugs] =
     await Promise.all([
       db
-        .select()
+        .select({
+          id: products.id,
+          name: products.name,
+          description: products.description,
+          price: products.price,
+          salePrice: products.salePrice,
+          saleStartsAt: products.saleStartsAt,
+          saleEndsAt: products.saleEndsAt,
+          isSaleActive: products.isSaleActive,
+          category: products.category,
+          categorySlug: products.categorySlug,
+          color: products.color,
+          isVisible: products.isVisible,
+          storeType: products.storeType,
+          firstImageUrl: sql<string | null>`(
+            SELECT (image_urls)[1]::text
+            FROM product_colors
+            WHERE product_id = products.id
+            ORDER BY id
+            LIMIT 1
+          )`.as("first_image_url"),
+        })
         .from(products)
         .where(and(eq(products.isVisible, true), eq(products.storeType, storeType as "streetwear" | "formal")))
         .orderBy(desc(products.id))
@@ -68,26 +85,11 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
       getLookbookItems(storeType),
       getLookbookSectionVisible(),
       getCategoriesForHome(storeType),
+      getStoreCategorySlugs(storeType),
     ]);
 
-  const productIds = productList.map((p) => p.id);
-  const colorsList =
-    productIds.length > 0
-      ? await db
-        .select()
-        .from(productColors)
-        .where(inArray(productColors.productId, productIds))
-      : [];
-
-
-  const firstImageByProductId: Record<number, string> = {};
-  for (const c of colorsList) {
-    if (!firstImageByProductId[c.productId] && c.imageUrls?.[0]) {
-      firstImageByProductId[c.productId] = c.imageUrls[0];
-    }
-  }
-  const discoverProducts = productList.map((p) => {
-    const imageUrls = firstImageByProductId[p.id] ? [firstImageByProductId[p.id]] : [];
+  const discoverProducts = productListWithImages.map((p) => {
+    const imageUrls = p.firstImageUrl ? [p.firstImageUrl] : [];
     return {
       id: p.id,
       name: p.name,

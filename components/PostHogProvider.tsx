@@ -42,7 +42,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
                 posthog.capture("$pageview", { $current_url: url });
             }
         } catch (e) {
-            // Gracefully swallow error to prevent UI crash
+            console.warn("PostHog pageview capture failed (rate-limited or unavailable).", e);
         }
     }, [pathname, searchParams]);
 

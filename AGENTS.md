@@ -16,8 +16,12 @@ MOSAIK is a fashion e-commerce Next.js 15 app (App Router, Turbopack, React 19, 
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase Storage |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase Storage (server) |
 | `RESEND_API_KEY` | Optional — order emails |
+| `UPSTASH_REDIS_REST_URL` | Optional — Upstash Redis for rate limiting |
+| `UPSTASH_REDIS_REST_TOKEN` | Optional — Upstash Redis token |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Optional — PostHog analytics |
+| `NEXT_PUBLIC_POSTHOG_HOST` | Optional — PostHog API host (default: https://us.i.posthog.com) |
 
-These must be written to `.env.local` before the app can start. The update script handles this automatically from injected environment variables.
+These must be written to `.env.local` before the app can start. See `.env.example` for a template. The update script handles this automatically from injected environment variables.
 
 ### Gotchas
 

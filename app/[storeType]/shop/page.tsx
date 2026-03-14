@@ -19,9 +19,9 @@ export async function generateMetadata({ params }: ShopPageProps): Promise<Metad
   const isStreetwear = storeType === "streetwear";
   const title = isStreetwear ? "Shop Streetwear" : storeType === "formal" ? "Shop Formal" : "Shop";
   const description = isStreetwear
-    ? "Browse our complete streetwear catalog. Find your perfect fit with our selection of modern hoodies, tees, and statement pieces."
+    ? "Browse our streetwear catalog. Modern hoodies, tees, and statement pieces for urban culture."
     : storeType === "formal"
-      ? "Explore our formal catalog. Discover bespoke trousers, blazers, and shirts designed for an elegant and confident look."
+      ? "Explore our formal catalog. Bespoke trousers, blazers, and shirts for an elegant, confident look."
       : "Browse the complete MOSAIK catalog.";
 
   return {
@@ -46,8 +46,11 @@ export default async function ShopPage({ params, searchParams }: ShopPageProps) 
   const search = await searchParams;
   const cat = search.cat;
 
-  const validSlugs = await getValidCategorySlugs();
-  const storeSlugs = await getStoreCategorySlugs(storeType);
+  const [validSlugs, storeSlugs, storeCategories] = await Promise.all([
+    getValidCategorySlugs(),
+    getStoreCategorySlugs(storeType),
+    getStoreCategories(storeType),
+  ]);
 
   if (storeSlugs.length === 0 && (storeType === "streetwear" || storeType === "formal")) {
     // Wait, if no categories seeded yet, let's at least allow the page to load, but we filter if seeded.
@@ -110,8 +113,6 @@ export default async function ShopPage({ params, searchParams }: ShopPageProps) 
     {}
   );
 
-  // const categories = await getCategories(); // Not used
-  const storeCategories = await getStoreCategories(storeType);
   const categoryLabel = catFilter && cat ? storeCategories.find((c) => c.slug === cat)?.label ?? null : null;
 
   let wishlistProductIds: number[] = [];

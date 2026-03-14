@@ -138,7 +138,9 @@ export const orders = pgTable("orders", {
   status: orderStatusEnum("status").notNull().default("PENDING"),
   paymentMethod: text("payment_method").notNull().default("COD"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("orders_created_at_idx").on(t.createdAt),
+]);
 
 // OrderItems
 export const orderItems = pgTable("order_items", {

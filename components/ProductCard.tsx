@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
+import { usePostHog } from "posthog-js/react";
 import { toggleWishlist } from "@/actions/toggleWishlist";
 import { useCart } from "@/context/CartContext";
 import { getProductDisplayPrice, isProductOnSale, getProductDiscountPercent } from "@/lib/utils";
@@ -31,6 +32,7 @@ export function ProductCard({
   const router = useRouter();
   const pathname = usePathname();
   const { isSignedIn } = useAuth();
+  const posthog = usePostHog();
   const { addToCart, openCart } = useCart();
 
   const storeTypeMatch = pathname?.match(/^\/(streetwear|formal)/);
@@ -119,6 +121,18 @@ export function ProductCard({
       productImage,
       productColor: colorName,
     });
+    try {
+      posthog?.capture("add_to_cart", {
+        product_id: product.id,
+        product_name: product.name,
+        price: displayPrice,
+        size,
+        color: colorName,
+        store_type: product.storeType,
+      });
+    } catch {
+      // Graceful degradation
+    }
     openCart();
   };
 

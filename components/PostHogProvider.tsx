@@ -5,6 +5,8 @@ import { PostHogProvider as PHProvider } from "posthog-js/react";
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
+export let posthogStatus: "loading" | "active" | "failed" | "limited" = "loading";
+
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
     const [isClient, setIsClient] = useState(false);
     const pathname = usePathname();
@@ -17,9 +19,15 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
                 posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
                     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
                     capture_pageview: false, // Handle routing manually for Next App Router
+                    loaded: (ph) => {
+                        posthogStatus = "active";
+                    },
                 });
+            } else {
+                posthogStatus = "failed";
             }
         } catch (e) {
+            posthogStatus = "failed";
             console.warn("PostHog initialization failed or was rate-limited.", e);
         }
     }, []);

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@clerk/nextjs";
 import { ProductCard } from "@/components/ProductCard";
+import { usePostHog } from "posthog-js/react";
 import type { Product } from "@/db/schema";
 import type { ProductVariant } from "@/db/schema";
 
@@ -28,6 +29,7 @@ export function CartClient({
   const router = useRouter();
   const { items, removeFromCart, updateQuantity, totalPrice } = useCart();
   const { isSignedIn } = useAuth();
+  const posthog = usePostHog();
   const [activeTab, setActiveTab] = useState<Tab>("basket");
 
   const amountToFreeDelivery = Math.max(0, FREE_DELIVERY_THRESHOLD - totalPrice);
@@ -40,6 +42,14 @@ export function CartClient({
       quantity: i.quantity,
       priceAtPurchase: i.priceAtPurchase,
     }));
+    try {
+      posthog?.capture("initiate_checkout", {
+        total_price: totalPrice,
+        item_count: items.length,
+      });
+    } catch (e) {
+      // ignore
+    }
     router.push(`/checkout?cart=${encodeURIComponent(JSON.stringify(cart))}`);
   };
 

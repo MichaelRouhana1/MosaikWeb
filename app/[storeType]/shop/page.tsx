@@ -16,9 +16,28 @@ import type { Metadata } from "next";
 
 export async function generateMetadata({ params }: ShopPageProps): Promise<Metadata> {
   const { storeType } = await params;
-  const title = storeType === "streetwear" ? "Streetwear Shop" : storeType === "formal" ? "Formal Shop" : "Shop";
+  const isStreetwear = storeType === "streetwear";
+  const title = isStreetwear ? "Shop Streetwear" : storeType === "formal" ? "Shop Formal" : "Shop";
+  const description = isStreetwear
+    ? "Browse our complete streetwear catalog. Find your perfect fit with our selection of modern hoodies, tees, and statement pieces."
+    : storeType === "formal"
+      ? "Explore our formal catalog. Discover bespoke trousers, blazers, and shirts designed for an elegant and confident look."
+      : "Browse the complete MOSAIK catalog.";
+
   return {
     title: `MOSAIK | ${title}`,
+    description,
+    openGraph: {
+      title: `MOSAIK | ${title}`,
+      description,
+      type: "website",
+      siteName: "MOSAIK",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `MOSAIK | ${title}`,
+      description,
+    }
   };
 }
 

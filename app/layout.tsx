@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { CartProvider } from "@/context/CartContext";
 import { Navbar } from "@/components/Navbar";
+import { PostHogProvider } from "@/components/PostHogProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,16 +39,18 @@ export default async function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
           <ThemeProvider>
-            <CartProvider>
-              <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:p-4 focus:bg-background focus:text-foreground">
-                Skip to content
-              </a>
-              <Navbar />
-              <div id="main-content">
-                {children}
-              </div>
-              <Toaster richColors position="top-right" />
-            </CartProvider>
+            <PostHogProvider>
+              <CartProvider>
+                <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:p-4 focus:bg-background focus:text-foreground">
+                  Skip to content
+                </a>
+                <Navbar />
+                <div id="main-content">
+                  {children}
+                </div>
+                <Toaster richColors position="top-right" />
+              </CartProvider>
+            </PostHogProvider>
           </ThemeProvider>
         </body>
       </html>

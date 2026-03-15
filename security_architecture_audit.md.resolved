@@ -223,6 +223,7 @@ export async function getHeroImages(storeType?: string): Promise<HeroImage[]> {
 | **The Flaw** | The store home page performs 8+ database queries: products, hero images, home video, lookbook items, section visibility, home categories, all categories, then a follow-up query for product colors. While `Promise.all` is used (good!), the query for `allCats` (line 47: `db.select().from(productCategories)`) fetches **all** categories regardless of store type and doesn't appear to be used in the rendered JSX. |
 | **The "Why"** | Unnecessary data fetching increases response time and database load. As the product catalog grows, these queries will slow down page loads. The `allCats` query appears to be dead code. |
 | **Recommendation** | 1) Remove the unused `allCats` query. 2) Consider using Drizzle's relational queries to fetch products with their first color image in a single query. 3) Implement database connection pooling (check that Transaction mode on Supabase is being used — the port `:6543` in the connection string confirms this, which is good). |
+| **Resolution** | ✅ **Resolved (2026-03-15):** Product list now uses `leftJoinLateral` with `productColors` to fetch each product and its first image in a single database round-trip. `getStoreCategorySlugs` is parallelized inside `Promise.all`. No separate `colorsList` lookup. |
 
 ---
 
@@ -247,6 +248,7 @@ export async function getHeroImages(storeType?: string): Promise<HeroImage[]> {
 | **The Flaw** | The rate limiter uses an in-memory `Map`. Deployed to Vercel or any serverless/multi-instance platform, each instance maintains its own Map, so rate limits are per-instance, not global. |
 | **The "Why"** | An attacker hitting multiple instances can bypass rate limits entirely. The code even has a comment acknowledging this: "For production multi-instance deployments, replace with a Redis-based limiter." |
 | **Recommendation** | For production: 1) Use `@upstash/ratelimit` with Upstash Redis (serverless-compatible, free tier available). 2) Or use Vercel Edge Middleware with `@vercel/kv`. The interface is similar so migration is straightforward. |
+| **Resolution** | ✅ **Resolved (2026-03-15):** Rate limiter uses `@upstash/ratelimit` with Upstash Redis. Redis client is only initialized when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are present (conditional check, no empty-string fallbacks). Set env vars in `.env.local` for production. |
 
 ---
 
@@ -265,6 +267,7 @@ import { index, uniqueIndex } from "drizzle-orm/pg-core";
 // On products:
 // .index("products_store_visible_idx", [products.storeType, products.isVisible])
 ``` Generate and run a migration after adding. |
+| **Resolution** | ✅ **Partially Resolved (2026-03-15):** `orders.createdAt` index added via migration `drizzle/0005_add_orders_created_at_index.sql` for Admin Dashboard statistics. Schema includes `products_store_type_idx` and `orders_created_at_idx`. Remaining indexes (wishlists composite, productColors.productId, etc.) still recommended. |
 
 ---
 
@@ -361,6 +364,7 @@ const queryClient = postgres(connectionString, {
   connect_timeout: 10,
 });
 ``` 3) Consider adding `prepare: false` for Supabase's transaction mode pooler, which doesn't support prepared statements. |
+| **Resolution** | ✅ **Addressed:** [db/index.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/db/index.ts) has `max: 10`, `idle_timeout: 20`, `connect_timeout: 10`, and `prepare: false`. |
 
 ---
 
@@ -396,9 +400,12 @@ const queryClient = postgres(connectionString, {
 | 🔴 **P0 — Do Now** | SEC-01 | Rotate ALL credentials. Verify Git history is clean. | 30 min | ✅ Fixed |
 | 🔴 **P0 — Do Now** | SEC-02 | Add HttpOnly, Secure, SameSite to `adminStore` cookie | 5 min | ✅ Fixed |
 | 🟠 **P1 — This Sprint** | SEC-04, SEC-05 | Add admin auth guards to [admin-store.ts](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/actions/admin-store.ts) actions | 10 min | ✅ Fixed |
+| 🟠 **P1 — This Sprint** | PERF-01 | Store page: single-round-trip product query via LEFT JOIN | — | ✅ Fixed |
+| 🟠 **P1 — This Sprint** | PERF-01 | Store page: LEFT JOIN for products+first image, parallelize category slugs | — | ✅ Fixed |
 | 🟠 **P1 — This Sprint** | PERF-02 | Remove `unoptimized` from all `<Image>` components | 30 min | ✅ Fixed |
 | 🟠 **P1 — This Sprint** | PERF-04 | Add database indexes to frequently queried columns | 30 min | ✅ Fixed |
 | 🟠 **P1 — This Sprint** | ARCH-01 | Add connection pool config and `prepare: false` | 10 min | ✅ Fixed |
+| 🟠 **P1 — This Sprint** | PERF-01 | Refactor store page: LEFT JOIN for products+images, parallelize category slugs | 30 min | ✅ Fixed |
 | 🟡 **P2 — Next Sprint** | SEC-03 | Implement nonce-based CSP | 2-4 hours | ✅ Fixed |
 | 🟡 **P2 — Next Sprint** | SEC-06 | Add Zod validation to all action parameters | 1 hour | ✅ Fixed |
 | 🟡 **P2 — Next Sprint** | PRIV-02 | Implement right-to-deletion architecture | 4 hours | ✅ Fixed |
@@ -407,6 +414,20 @@ const queryClient = postgres(connectionString, {
 | 🟢 **P3 — Backlog** | DEV-03 | Consolidate upload functions | 1 hour | ✅ Fixed |
 | 🟢 **P3 — Backlog** | UX-01 | Add ARIA labels and semantic improvements | 2 hours | ✅ Fixed |
 | 🟢 **P3 — Backlog** | ARCH-02 | Set up structured logging service | 2 hours | |
+
+---
+
+## 📋 Implementation Updates (2026-03-15)
+
+The following items have been verified as completed based on recent implementation work:
+
+| Flaw | Status | Implementation |
+|------|--------|----------------|
+| **PERF-01** | ✅ Resolved | Store home page uses `leftJoinLateral` with `productColors` to fetch products + first image in a single round-trip. `getStoreCategorySlugs` runs inside `Promise.all`. No separate `colorsList` lookup. |
+| **PERF-03** | ✅ Resolved | Rate limiter uses `@upstash/ratelimit` with Upstash Redis. Conditional init only when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are present (no empty-string fallbacks). |
+| **PERF-04** | ✅ Partially Resolved | `orders.createdAt` index added via migration `drizzle/0005_add_orders_created_at_index.sql`. Schema has `products_store_type_idx` and `orders_created_at_idx`. |
+| **ARCH-01** | ✅ Verified | `db/index.ts` has pool config: `max: 10`, `idle_timeout: 20`, `connect_timeout: 10`, `prepare: false`. |
+| **SEC-02, SEC-04, SEC-05, PRIV-01** | ✅ Verified | `admin-store.ts` has admin auth guards; cookie uses `httpOnly`, `secure`, `sameSite: "strict"`, `maxAge`. |
 
 ---
 

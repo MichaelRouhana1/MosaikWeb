@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { useDropzone } from "react-dropzone";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createProduct } from "@/actions/createProduct";
 import { Button } from "@/components/ui/button";

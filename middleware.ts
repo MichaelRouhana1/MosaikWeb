@@ -71,7 +71,7 @@ export default clerkMiddleware(async (auth, req) => {
             { status: 429, headers: { "Content-Type": "application/json" } }
           );
         }
-      } catch (e) {
+      } catch {
         // allow if redis fails
       }
     }

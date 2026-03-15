@@ -26,18 +26,26 @@ export function AnalyticsStatus() {
           Analytics Health
         </p>
         <div className={`w-2 h-2 rounded-full ${
-          status === "active" ? "bg-green-500" : 
-          status === "failed" ? "bg-red-500" : "bg-yellow-500"
+          status === "active" ? "bg-green-500" :
+          status === "failed" ? "bg-red-500" :
+          status === "limited" ? "bg-yellow-500" : "bg-yellow-500"
         }`} />
       </div>
-      
+
       {status === "active" ? (
-        <p className="text-sm font-medium text-foreground">Active & Tracking</p>
+        <p className="text-sm font-medium text-foreground">Healthy — Active & Tracking</p>
+      ) : status === "limited" ? (
+        <div>
+          <p className="text-sm font-medium text-yellow-600 dark:text-yellow-500">Rate Limited</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            PostHog free-tier limits reached. Events may be dropped.
+          </p>
+        </div>
       ) : (
         <div>
-          <p className="text-sm font-medium text-destructive">Connection Interrupted</p>
+          <p className="text-sm font-medium text-destructive">Unhealthy — Connection Interrupted</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Likely reached free-tier limits or missing API key.
+            Missing API key or initialization failed. Check NEXT_PUBLIC_POSTHOG_KEY.
           </p>
         </div>
       )}

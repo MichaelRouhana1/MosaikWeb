@@ -31,7 +31,7 @@ export function AdminHeader({ onMenuClick, initialStore }: AdminHeaderProps) {
         to_store: newStore,
         actor: "admin",
       });
-    } catch (e) {
+    } catch {
       // Gracefully ignore
     }
     setCurrentStore(newStore);

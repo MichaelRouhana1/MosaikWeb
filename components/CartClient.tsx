@@ -47,7 +47,7 @@ export function CartClient({
         total_price: totalPrice,
         item_count: items.length,
       });
-    } catch (e) {
+    } catch {
       // ignore
     }
     router.push(`/checkout?cart=${encodeURIComponent(JSON.stringify(cart))}`);

@@ -14,7 +14,7 @@ export function DeleteAccountButton() {
                 try {
                     await deleteAccount();
                     // The server action redirects on success
-                } catch (error) {
+                } catch {
                     toast.error("Failed to delete account. Please try again.");
                 }
             });

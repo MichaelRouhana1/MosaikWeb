@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
@@ -73,11 +73,14 @@ export function ProductDetailClient({
     setSelectedColorState(matched ?? firstColor ?? null);
   }, [colorFromUrl, firstColor, colors]);
 
-  const imageUrls = (selectedColor?.imageUrls ?? product.images) ?? [];
+  const imageUrls = useMemo(
+    () => (selectedColor?.imageUrls ?? product.images) ?? [],
+    [selectedColor?.imageUrls, product.images]
+  );
 
   useEffect(() => {
     setDisplayOrder(imageUrls.map((_, i) => i));
-  }, [product.id, imageUrls.length, selectedColor?.id]);
+  }, [imageUrls, product.id, selectedColor?.id]);
 
   useEffect(() => {
     carouselApi?.scrollTo(0);
@@ -249,7 +252,7 @@ export function ProductDetailClient({
         color: colorName,
         store_type: product.storeType
       });
-    } catch (e) {
+    } catch {
       // ignore
     }
     openCart();

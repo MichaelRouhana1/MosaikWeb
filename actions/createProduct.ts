@@ -4,10 +4,9 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { products, productVariants, productColors } from "@/db/schema";
-import { uploadProductImage, uploadProductImages } from "@/lib/uploadImages";
+import { uploadProductImages } from "@/lib/uploadImages";
 import { getValidCategorySlugs } from "@/actions/categories";
 import { auditLog } from "@/lib/audit";
-import { z } from "zod";
 import { productSchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
 

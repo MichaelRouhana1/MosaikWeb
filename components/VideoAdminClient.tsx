@@ -55,7 +55,7 @@ export function VideoAdminClient({ video: initialVideo, initialStoreType }: Vide
       }
       router.refresh();
     },
-    [router]
+    [router, initialStoreType]
   );
 
   const handleCropCancel = useCallback(() => {

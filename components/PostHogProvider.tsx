@@ -19,7 +19,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
                 posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
                     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
                     capture_pageview: false, // Handle routing manually for Next App Router
-                    loaded: (ph) => {
+                    loaded: () => {
                         posthogStatus = "active";
                     },
                 });

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { products, productVariants, productColors } from "@/db/schema";
-import { uploadProductImage, uploadProductImages } from "@/lib/uploadImages";
+import { uploadProductImages } from "@/lib/uploadImages";
 import { getValidCategorySlugs } from "@/actions/categories";
 import { auditLog } from "@/lib/audit";
 import { z } from "zod";

@@ -58,8 +58,7 @@ export function CategoriesAdminClient({ categories: initialCategories, initialSt
     setFormSlug(cat.slug);
     setFormLabel(cat.label);
     setFormShowOnHome(cat.showOnHome);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const catStoreType = (cat as any).storeType || "both";
+    const catStoreType = (cat.storeType ?? "both") as "streetwear" | "formal" | "both";
     setFormStoreType(catStoreType);
     setEditingId(cat.id);
   };
@@ -247,8 +246,7 @@ export function CategoriesAdminClient({ categories: initialCategories, initialSt
                     )}
                   </div>
                 </td>
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                <td className="p-4 capitalize">{(cat as any).storeType || "streetwear"}</td>
+                <td className="p-4 capitalize">{cat.storeType ?? "streetwear"}</td>
                 <td className="p-4 font-mono text-muted-foreground">{cat.slug}</td>
                 <td className="p-4">{cat.label}</td>
                 <td className="p-4">{cat.showOnHome ? "Yes" : "No"}</td>

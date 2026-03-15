@@ -9,7 +9,7 @@ import { products } from "@/db/schema";
 import { isNull } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 
-export async function setAdminStoreType(storeType: "streetwear" | "formal") {
+export async function setAdminStoreType(storeType: "streetwear" | "formal"): Promise<void> {
     const { userId, sessionClaims } = await auth();
     if (!userId || sessionClaims?.metadata?.role !== "admin") {
         throw new Error("Unauthorized");
@@ -36,7 +36,7 @@ export async function getAdminStoreType(): Promise<"streetwear" | "formal"> {
     return "streetwear"; // default
 }
 
-export async function migrateMissingStoreTypes() {
+export async function migrateMissingStoreTypes(): Promise<{ success?: boolean; error?: string }> {
     const { userId, sessionClaims } = await auth();
     if (!userId || sessionClaims?.metadata?.role !== "admin") {
         return { error: "Unauthorized" };

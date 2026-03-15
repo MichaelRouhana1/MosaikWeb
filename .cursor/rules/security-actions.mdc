@@ -1,0 +1,18 @@
+---
+description: Security protocols for Server Actions and sensitive logic
+alwaysApply: false
+globs: actions/**/*.ts, app/api/**/*.ts
+---
+# Security & Hardening
+
+## Admin Protection
+- All admin actions MUST verify Clerk 'admin' metadata before execution.
+- Use Zod schemas for all input validation to prevent injection.
+
+## Audit Logging
+- Log sensitive operations (deletes, status changes, promo updates) via `lib/logger.ts`.
+
+## Type Safety
+- **No `any` allowed.**
+- Server Actions must have explicit return types: `Promise<{ success: boolean; error?: string }>`.
+- Use `storeTypeEnum` from schema strictly; no string casting for `storeType`.

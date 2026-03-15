@@ -1,0 +1,18 @@
+---
+description: Global project standards, Git workflow, and tech stack gotchas
+alwaysApply: true
+---
+# MOSAIK Global Standards
+
+## Tech Stack
+- Next.js 15 (App Router), Turbopack, React 19.1.0, Tailwind CSS v4.
+- Drizzle ORM, Supabase, Clerk Auth.
+
+## Critical Constraints
+- **Install:** Always use `npm install --legacy-peer-deps`.
+- **Secrets:** Never log or commit plaintext secrets. Add new vars to `.env.example`.
+- **Clerk:** Dev mode returns 500 for non-browser requests (missing dev-browser cookie).
+
+## Post-Prompt Workflow
+- After changes, provide this command: `git add . && git commit -m "type: description" && git push`.
+- Use present-tense, concise summaries (e.g., "feat: add product filter").

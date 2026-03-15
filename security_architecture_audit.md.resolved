@@ -149,6 +149,7 @@ if (!userId || sessionClaims?.metadata?.role !== "admin") {
 | **The Flaw** | Three instances of `as any` type casting found: [(cat as any).storeType](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/utils.ts#4-7) and event handler casting. This bypasses TypeScript's type system. |
 | **The "Why"** | TypeScript strict mode is enabled (good!), but `as any` defeats its purpose. If the [ProductCategory](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/db/schema.ts#256-257) type changes or `storeType` is ever removed/renamed, these lines will silently break instead of throwing compile errors. |
 | **Recommendation** | 1) Ensure the [ProductCategory](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/db/schema.ts#256-257) type exported from schema includes `storeType`. 2) Replace [(cat as any).storeType](file:///c:/Users/PC%20FACTORY/Desktop/MosaikWeb/lib/utils.ts#4-7) with `cat.storeType`. 3) Use proper typing: `onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormStoreType(e.target.value as "streetwear" | "formal" | "both")}`. |
+| **Resolution** | ✅ **Resolved (2026-03-15):** Replaced `(cat as any).storeType` with `cat.storeType ?? "streetwear"` in CategoriesAdminClient. Removed eslint-disable. `lib/schemas.ts` has `STORE_TYPE_VALUES`, `StoreType`, and `storeTypeSchema`; forms use proper types. |
 
 ---
 
@@ -209,6 +210,7 @@ const name = z.string().min(1).parse(formData.get("name"));
 | **Recommendation** | Add explicit return types to all exported server actions: ```typescript
 export async function getHeroImages(storeType?: string): Promise<HeroImage[]> {
 ``` |
+| **Resolution** | ✅ **Partially Resolved (2026-03-15):** `migrateMissingStoreTypes` in `actions/admin-store.ts` now has explicit return type `Promise<{ success?: boolean; error?: string }>`. Other actions (hero, lookbook, video, etc.) still inferred. |
 
 ---
 
@@ -428,6 +430,8 @@ The following items have been verified as completed based on recent implementati
 | **PERF-04** | ✅ Partially Resolved | `orders.createdAt` index added via migration `drizzle/0005_add_orders_created_at_index.sql`. Schema has `products_store_type_idx` and `orders_created_at_idx`. |
 | **ARCH-01** | ✅ Verified | `db/index.ts` has pool config: `max: 10`, `idle_timeout: 20`, `connect_timeout: 10`, `prepare: false`. |
 | **SEC-02, SEC-04, SEC-05, PRIV-01** | ✅ Verified | `admin-store.ts` has admin auth guards; cookie uses `httpOnly`, `secure`, `sameSite: "strict"`, `maxAge`. |
+| **DEV-01** | ✅ Resolved | Replaced `(cat as any).storeType` with `cat.storeType ?? "streetwear"` in CategoriesAdminClient. Removed eslint-disable. `lib/schemas.ts` has proper `StoreType`, `storeTypeSchema`; forms use typed storeType. |
+| **DEV-05** | ✅ Partially Resolved | `migrateMissingStoreTypes` in `actions/admin-store.ts` has explicit return type `Promise<{ success?: boolean; error?: string }>`. |
 
 ---
 

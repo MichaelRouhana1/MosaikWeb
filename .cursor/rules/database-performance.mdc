@@ -1,0 +1,14 @@
+---
+description: Database optimization and Drizzle ORM standards
+alwaysApply: false
+globs: db/**/*.ts, app/[storeType]/**/*.tsx, actions/**/*.ts
+---
+# Database & Performance
+
+## Query Optimization
+- Favor `leftJoinLateral` for relational data (Product + Images) to avoid N+1 patterns.
+- Group independent DB calls into `Promise.all` blocks.
+
+## Schema Sync
+- New indexes must be explicitly defined in `db/schema.ts` to align with PostgreSQL.
+- **Port Gotcha:** Use port 5432 for `drizzle-kit push`. Port 6543 (pooler) will hang.

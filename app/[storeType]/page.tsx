@@ -1,6 +1,6 @@
 import { eq, desc, and, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { products } from "@/db/schema";
+import { products, productColors } from "@/db/schema";
 import { getHeroImages } from "@/actions/hero";
 import { getHomeVideo } from "@/actions/video";
 import { getLookbookItems, getLookbookSectionVisible } from "@/actions/lookbook";
@@ -51,6 +51,16 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
   const { storeType } = await params;
   if (storeType !== "streetwear" && storeType !== "formal") return notFound();
 
+  const firstColorSubq = db
+    .select({
+      firstImageUrl: sql<string>`(image_urls)[1]::text`.as("first_image_url"),
+    })
+    .from(productColors)
+    .where(eq(productColors.productId, products.id))
+    .orderBy(productColors.id)
+    .limit(1)
+    .as("first_color");
+
   const [productListWithImages, heroImages, homeVideo, lookbookItems, lookbookSectionVisible, homeCategories, storeSlugs] =
     await Promise.all([
       db
@@ -68,15 +78,10 @@ export default async function HomePage({ params }: { params: Promise<{ storeType
           color: products.color,
           isVisible: products.isVisible,
           storeType: products.storeType,
-          firstImageUrl: sql<string | null>`(
-            SELECT (image_urls)[1]::text
-            FROM product_colors
-            WHERE product_id = products.id
-            ORDER BY id
-            LIMIT 1
-          )`.as("first_image_url"),
+          firstImageUrl: firstColorSubq.firstImageUrl,
         })
         .from(products)
+        .leftJoinLateral(firstColorSubq, sql`true`)
         .where(and(eq(products.isVisible, true), eq(products.storeType, storeType as "streetwear" | "formal")))
         .orderBy(desc(products.id))
         .limit(8),

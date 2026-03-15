@@ -1,12 +1,14 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
-const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
-const redis =
-  url && token
-    ? new Redis({ url, token })
-    : null;
+const url = process.env.UPSTASH_REDIS_REST_URL;
+const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+const hasRedisEnv =
+  typeof url === "string" &&
+  url.length > 0 &&
+  typeof token === "string" &&
+  token.length > 0;
+const redis = hasRedisEnv ? new Redis({ url: url!, token: token! }) : null;
 
 // Common limited operations: 5 requests per 10 seconds
 const defaultLimiter = redis
